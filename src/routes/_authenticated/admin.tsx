@@ -1,0 +1,448 @@
+import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import { LogOut, RefreshCw } from "lucide-react";
+
+import { supabase } from "@/integrations/supabase/client";
+import { formatCedis } from "@/lib/format";
+import {
+  BUSINESS,
+  DELIVERY_LOCATIONS,
+  DELIVERY_WINDOWS,
+  ORDER_STATUSES,
+  type OrderStatus,
+} from "@/lib/constants";
+import { claimAdmin } from "@/lib/admin.functions";
+
+export const Route = createFileRoute("/_authenticated/admin")({
+  head: () => ({
+    meta: [
+      { title: "Order Dashboard — Einyornose" },
+      { name: "description", content: "Manage Einyornose breakfast orders." },
+      { property: "og:title", content: "Order Dashboard — Einyornose" },
+      { property: "og:description", content: "Manage Einyornose breakfast orders." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
+  component: AdminPage,
+});
+
+type OrderRow = {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  customer_phone: string;
+  delivery_location: string;
+  delivery_window: string;
+  payment_method: string;
+  additional_instructions: string;
+  subtotal: number;
+  total: number;
+  status: OrderStatus;
+  created_at: string;
+  order_items: {
+    id: string;
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    subtotal: number;
+  }[];
+};
+
+const selectClass =
+  "h-11 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-primary";
+
+function AdminPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const claim = useServerFn(claimAdmin);
+
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [windowFilter, setWindowFilter] = useState("all");
+  const [todayOnly, setTodayOnly] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const rolesQuery = useQuery({
+    queryKey: ["admin-role"],
+    queryFn: async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return false;
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userData.user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      if (error) throw error;
+      return !!data;
+    },
+  });
+
+  const isAdmin = rolesQuery.data === true;
+
+  const ordersQuery = useQuery({
+    queryKey: ["admin-orders"],
+    enabled: isAdmin,
+    queryFn: async (): Promise<OrderRow[]> => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, additional_instructions, subtotal, total, status, created_at, order_items(id, product_name, quantity, unit_price, subtotal)",
+        )
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as OrderRow[];
+    },
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: OrderStatus }) => {
+      const { error } = await supabase.from("orders").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Order status updated");
+      void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: () => toast.error("Could not update the order status."),
+  });
+
+  const orders = ordersQuery.data ?? [];
+
+  const filtered = useMemo(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    return orders.filter((order) => {
+      if (statusFilter !== "all" && order.status !== statusFilter) return false;
+      if (locationFilter !== "all" && order.delivery_location !== locationFilter) return false;
+      if (windowFilter !== "all" && order.delivery_window !== windowFilter) return false;
+      if (todayOnly && new Date(order.created_at) < startOfToday) return false;
+      return true;
+    });
+  }, [orders, statusFilter, locationFilter, windowFilter, todayOnly]);
+
+  const totalSales = filtered
+    .filter((o) => o.status !== "Cancelled")
+    .reduce((sum, o) => sum + Number(o.total), 0);
+
+  async function signOut() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  }
+
+  if (rolesQuery.isLoading) {
+    return <p className="p-8 text-center text-muted-foreground">Checking your access…</p>;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="font-display text-2xl font-bold">Administrator access required</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Your account isn't an administrator yet. If you are the {BUSINESS.name} owner setting up
+          the store for the first time, you can claim the administrator role now.
+        </p>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await claim({});
+              toast.success("You are now the administrator.");
+              void rolesQuery.refetch();
+            } catch (error) {
+              toast.error(
+                error instanceof Error ? error.message : "Could not grant administrator access.",
+              );
+            }
+          }}
+          className="mt-6 h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground"
+        >
+          Claim administrator access
+        </button>
+        <button
+          type="button"
+          onClick={signOut}
+          className="mt-3 h-11 w-full rounded-xl border border-border text-sm font-medium"
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card">
+        <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-4">
+          <div className="min-w-0">
+            <h1 className="truncate font-display text-xl font-bold sm:text-2xl">
+              Order dashboard
+            </h1>
+            <Link to="/" className="text-xs text-muted-foreground underline">
+              Back to {BUSINESS.name} store
+            </Link>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => void ordersQuery.refetch()}
+              aria-label="Refresh orders"
+              className="grid h-11 w-11 place-items-center rounded-xl border border-border"
+            >
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={signOut}
+              aria-label="Sign out"
+              className="grid h-11 w-11 place-items-center rounded-xl border border-border"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Stat label="Orders shown" value={String(filtered.length)} />
+          <Stat label="Total sales" value={formatCedis(totalSales)} />
+          <Stat
+            label="New orders"
+            value={String(filtered.filter((o) => o.status === "New").length)}
+          />
+        </div>
+
+        <div className="surface-card mt-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="block text-sm font-semibold">
+            Status
+            <select
+              className={`${selectClass} mt-1`}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All statuses</option>
+              {ORDER_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm font-semibold">
+            Delivery location
+            <select
+              className={`${selectClass} mt-1`}
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+            >
+              <option value="all">All locations</option>
+              {DELIVERY_LOCATIONS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm font-semibold">
+            Delivery window
+            <select
+              className={`${selectClass} mt-1`}
+              value={windowFilter}
+              onChange={(e) => setWindowFilter(e.target.value)}
+            >
+              <option value="all">All windows</option>
+              {DELIVERY_WINDOWS.map((w) => (
+                <option key={w} value={w}>
+                  {w}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-end gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-[var(--color-primary)]"
+              checked={todayOnly}
+              onChange={(e) => setTodayOnly(e.target.checked)}
+            />
+            Today's orders only
+          </label>
+        </div>
+
+        {ordersQuery.isLoading ? (
+          <p className="mt-8 text-center text-muted-foreground">Loading orders…</p>
+        ) : filtered.length === 0 ? (
+          <p className="mt-8 text-center text-muted-foreground">No orders match these filters.</p>
+        ) : (
+          <>
+            {/* Mobile cards */}
+            <ul className="mt-4 space-y-3 lg:hidden">
+              {filtered.map((order) => (
+                <li key={order.id} className="surface-card p-4">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+                    <div className="min-w-0">
+                      <p className="font-display text-lg font-bold">#{order.order_number}</p>
+                      <p className="truncate text-sm">Customer: {order.customer_name}</p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {order.customer_phone}
+                      </p>
+                    </div>
+                    <StatusBadge status={order.status} />
+                  </div>
+                  <dl className="mt-3 space-y-1 text-sm">
+                    <Line label="Location" value={order.delivery_location} />
+                    <Line label="Delivery" value={order.delivery_window} />
+                    <Line label="Payment" value={order.payment_method} />
+                    <Line label="Total" value={formatCedis(Number(order.total))} />
+                  </dl>
+                  <OrderItems order={order} />
+                  <StatusSelect
+                    order={order}
+                    onChange={(status) => updateStatus.mutate({ id: order.id, status })}
+                  />
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop table */}
+            <div className="surface-card mt-4 hidden overflow-x-auto lg:block">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-secondary text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="px-4 py-3">Order</th>
+                    <th className="px-4 py-3">Customer</th>
+                    <th className="px-4 py-3">Location</th>
+                    <th className="px-4 py-3">Delivery</th>
+                    <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-3">Total</th>
+                    <th className="px-4 py-3">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filtered.map((order) => (
+                    <>
+                      <tr key={order.id} className="align-top">
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            className="font-semibold underline"
+                            onClick={() =>
+                              setExpanded(expanded === order.id ? null : order.id)
+                            }
+                          >
+                            #{order.order_number}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          {order.customer_name}
+                          <span className="block text-xs text-muted-foreground">
+                            {order.customer_phone}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">{order.delivery_location}</td>
+                        <td className="px-4 py-3">{order.delivery_window}</td>
+                        <td className="px-4 py-3">{order.payment_method}</td>
+                        <td className="px-4 py-3 font-semibold">
+                          {formatCedis(Number(order.total))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusSelect
+                            order={order}
+                            onChange={(status) => updateStatus.mutate({ id: order.id, status })}
+                          />
+                        </td>
+                      </tr>
+                      {expanded === order.id ? (
+                        <tr key={`${order.id}-details`}>
+                          <td colSpan={7} className="bg-secondary/40 px-4 py-3">
+                            <OrderItems order={order} />
+                            {order.additional_instructions ? (
+                              <p className="mt-2 text-sm">
+                                <span className="font-semibold">Instructions:</span>{" "}
+                                {order.additional_instructions}
+                              </p>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ) : null}
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="surface-card p-4">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 font-display text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function Line({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-right font-medium">{value}</dd>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: OrderStatus }) {
+  return (
+    <span className="shrink-0 rounded-full bg-secondary px-3 py-1 text-xs font-bold text-secondary-foreground">
+      {status}
+    </span>
+  );
+}
+
+function OrderItems({ order }: { order: OrderRow }) {
+  return (
+    <ul className="mt-3 space-y-1 rounded-xl bg-secondary/60 p-3 text-sm">
+      {order.order_items.map((item) => (
+        <li key={item.id} className="flex justify-between gap-3">
+          <span className="min-w-0">
+            {item.product_name} × {item.quantity}
+          </span>
+          <span className="shrink-0 font-semibold">{formatCedis(Number(item.subtotal))}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function StatusSelect({
+  order,
+  onChange,
+}: {
+  order: OrderRow;
+  onChange: (status: OrderStatus) => void;
+}) {
+  return (
+    <select
+      aria-label={`Status for order ${order.order_number}`}
+      className={`${selectClass} mt-3 lg:mt-0 lg:w-44`}
+      value={order.status}
+      onChange={(e) => onChange(e.target.value as OrderStatus)}
+    >
+      {ORDER_STATUSES.map((status) => (
+        <option key={status} value={status}>
+          {status}
+        </option>
+      ))}
+    </select>
+  );
+}
