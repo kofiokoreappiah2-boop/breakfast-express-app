@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -326,8 +326,8 @@ function AdminPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filtered.map((order) => (
-                    <>
-                      <tr key={order.id} className="align-top">
+                    <Fragment key={order.id}>
+                      <tr className="align-top">
                         <td className="px-4 py-3">
                           <button
                             type="button"
@@ -359,7 +359,7 @@ function AdminPage() {
                         </td>
                       </tr>
                       {expanded === order.id ? (
-                        <tr key={`${order.id}-details`}>
+                        <tr>
                           <td colSpan={7} className="bg-secondary/40 px-4 py-3">
                             <OrderItems order={order} />
                             {order.additional_instructions ? (
@@ -371,7 +371,7 @@ function AdminPage() {
                           </td>
                         </tr>
                       ) : null}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
