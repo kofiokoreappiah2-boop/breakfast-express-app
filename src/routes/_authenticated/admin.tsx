@@ -477,3 +477,37 @@ function StatusSelect({
     </select>
   );
 }
+
+function PaymentStatusSelect({
+  order,
+  onChange,
+}: {
+  order: OrderRow;
+  onChange: (paymentStatus: PaymentStatus) => void;
+}) {
+  return (
+    <select
+      aria-label={`Payment status for order ${order.order_number}`}
+      className={`${selectClass} mt-3 lg:mt-0 lg:w-36`}
+      value={order.payment_status}
+      onChange={(e) => onChange(e.target.value as PaymentStatus)}
+    >
+      {PAYMENT_STATUSES.map((status) => (
+        <option key={status} value={status}>
+          {status}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function Instructions({ order }: { order: OrderRow }) {
+  return (
+    <div className="mt-3 rounded-xl border border-border p-3 text-sm">
+      <p className="font-semibold">Additional Delivery Instructions</p>
+      <p className="mt-1 text-muted-foreground">
+        {order.additional_instructions?.trim() ? order.additional_instructions : "None provided"}
+      </p>
+    </div>
+  );
+}
