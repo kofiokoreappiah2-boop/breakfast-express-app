@@ -100,9 +100,12 @@ function ConfirmationPage() {
               <Row label="Delivery location" value={receipt.deliveryLocation} />
               <Row label="Delivery window" value={receipt.deliveryWindow} />
               <Row label="Payment method" value={receipt.paymentMethod} />
-              {receipt.additionalInstructions ? (
-                <Row label="Instructions" value={receipt.additionalInstructions} />
-              ) : null}
+              <Row label="Payment status" value={receipt.paymentStatus} />
+              <Row
+                label="Additional delivery instructions"
+                value={receipt.additionalInstructions || "None"}
+              />
+
 
               <div className="border-t border-border pt-3">
                 <p className="text-sm font-semibold">Items ordered</p>
