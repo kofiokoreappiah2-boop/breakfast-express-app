@@ -76,7 +76,7 @@ export const createOrder = createServerFn({ method: "POST" })
         subtotal,
         total: subtotal,
       })
-      .select("id, order_number, subtotal, total, created_at")
+      .select("id, order_number, subtotal, total, created_at, payment_status, additional_instructions")
       .single();
 
     if (orderError || !order) throw new Error("We couldn't place your order. Please try again.");
@@ -104,7 +104,8 @@ export const createOrder = createServerFn({ method: "POST" })
       deliveryLocation: data.deliveryLocation,
       deliveryWindow: data.deliveryWindow,
       paymentMethod: data.paymentMethod,
-      additionalInstructions: data.additionalInstructions ?? "",
+      paymentStatus: order.payment_status as string,
+      additionalInstructions: order.additional_instructions ?? "",
       total: Number(order.total),
       subtotal: Number(order.subtotal),
       items: rows.map((r) => ({
