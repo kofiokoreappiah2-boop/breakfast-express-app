@@ -376,6 +376,14 @@ function AdminPage() {
                         <td className="px-4 py-3">{order.delivery_location}</td>
                         <td className="px-4 py-3">{order.delivery_window}</td>
                         <td className="px-4 py-3">{order.payment_method}</td>
+                        <td className="px-4 py-3">
+                          <PaymentStatusSelect
+                            order={order}
+                            onChange={(paymentStatus) =>
+                              updatePayment.mutate({ id: order.id, paymentStatus })
+                            }
+                          />
+                        </td>
                         <td className="px-4 py-3 font-semibold">
                           {formatCedis(Number(order.total))}
                         </td>
@@ -388,14 +396,9 @@ function AdminPage() {
                       </tr>
                       {expanded === order.id ? (
                         <tr>
-                          <td colSpan={7} className="bg-secondary/40 px-4 py-3">
+                          <td colSpan={8} className="bg-secondary/40 px-4 py-3">
                             <OrderItems order={order} />
-                            {order.additional_instructions ? (
-                              <p className="mt-2 text-sm">
-                                <span className="font-semibold">Instructions:</span>{" "}
-                                {order.additional_instructions}
-                              </p>
-                            ) : null}
+                            <Instructions order={order} />
                           </td>
                         </tr>
                       ) : null}
