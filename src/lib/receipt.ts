@@ -7,6 +7,7 @@ export type StoredReceipt = {
   deliveryLocation: string;
   deliveryWindow: string;
   paymentMethod: string;
+  paymentStatus: string;
   additionalInstructions: string;
   subtotal: number;
   total: number;

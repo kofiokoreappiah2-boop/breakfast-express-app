@@ -73,6 +73,7 @@ export type Database = {
           id: string
           order_number: string
           payment_method: string
+          payment_status: Database["public"]["Enums"]["payment_status"]
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           total: number
@@ -87,6 +88,7 @@ export type Database = {
           id?: string
           order_number?: string
           payment_method: string
+          payment_status?: Database["public"]["Enums"]["payment_status"]
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total?: number
@@ -101,6 +103,7 @@ export type Database = {
           id?: string
           order_number?: string
           payment_method?: string
+          payment_status?: Database["public"]["Enums"]["payment_status"]
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           total?: number
@@ -177,6 +180,7 @@ export type Database = {
         | "Out for Delivery"
         | "Delivered"
         | "Cancelled"
+      payment_status: "Pending" | "Paid" | "Failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -313,6 +317,7 @@ export const Constants = {
         "Delivered",
         "Cancelled",
       ],
+      payment_status: ["Pending", "Paid", "Failed"],
     },
   },
 } as const

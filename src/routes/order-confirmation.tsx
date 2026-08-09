@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { Printer, Share2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -29,9 +31,46 @@ function ConfirmationPage() {
     setReady(true);
   }, []);
 
+  function buildPlainText(r: StoredReceipt): string {
+    const lines = [
+      `${BUSINESS.name} — Order #${r.orderNumber}`,
+      `Name: ${r.customerName}`,
+      `Phone: ${r.customerPhone}`,
+      `Delivery location: ${r.deliveryLocation}`,
+      `Delivery window: ${r.deliveryWindow}`,
+      `Payment method: ${r.paymentMethod}`,
+      `Payment status: ${r.paymentStatus}`,
+      `Instructions: ${r.additionalInstructions || "None"}`,
+      "Items:",
+      ...r.items.map(
+        (i) =>
+          `  - ${i.name}${i.size ? ` (${i.size})` : ""} x${i.quantity} = ${formatCedis(i.subtotal)}`,
+      ),
+      `Total: ${formatCedis(r.total)}`,
+    ];
+    return lines.join("\n");
+  }
+
+  async function shareOrder() {
+    if (!receipt) return;
+    const text = buildPlainText(receipt);
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: `Order #${receipt.orderNumber}`, text });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      toast.success("Order details copied to your clipboard.");
+    } catch {
+      // User cancelled the share sheet — nothing to report.
+    }
+  }
+
   return (
     <div className="min-h-screen">
-      <SiteHeader />
+      <div className="print:hidden">
+        <SiteHeader />
+      </div>
       <main className="mx-auto max-w-2xl px-4 py-8">
         {!ready ? null : !receipt ? (
           <div className="surface-card p-8 text-center">
@@ -61,9 +100,12 @@ function ConfirmationPage() {
               <Row label="Delivery location" value={receipt.deliveryLocation} />
               <Row label="Delivery window" value={receipt.deliveryWindow} />
               <Row label="Payment method" value={receipt.paymentMethod} />
-              {receipt.additionalInstructions ? (
-                <Row label="Instructions" value={receipt.additionalInstructions} />
-              ) : null}
+              <Row label="Payment status" value={receipt.paymentStatus} />
+              <Row
+                label="Additional delivery instructions"
+                value={receipt.additionalInstructions || "None"}
+              />
+
 
               <div className="border-t border-border pt-3">
                 <p className="text-sm font-semibold">Items ordered</p>
@@ -103,6 +145,25 @@ function ConfirmationPage() {
               </div>
             ) : null}
 
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 print:hidden">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex h-12 items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground shadow-lift"
+              >
+                <Printer className="h-4 w-4" aria-hidden="true" />
+                Save / Print order
+              </button>
+              <button
+                type="button"
+                onClick={() => void shareOrder()}
+                className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card text-base font-semibold"
+              >
+                <Share2 className="h-4 w-4" aria-hidden="true" />
+                Share order
+              </button>
+            </div>
+
             <p className="mt-6 text-center text-base">
               Thank you for ordering from {BUSINESS.name}. Your breakfast will be delivered during
               your selected delivery period.
@@ -110,14 +171,16 @@ function ConfirmationPage() {
 
             <Link
               to="/"
-              className="mt-6 flex h-12 w-full items-center justify-center rounded-xl bg-primary text-base font-semibold text-primary-foreground"
+              className="mt-6 flex h-12 w-full items-center justify-center rounded-xl border border-border text-base font-semibold print:hidden"
             >
               Back to Menu
             </Link>
           </>
         )}
       </main>
-      <SiteFooter />
+      <div className="print:hidden">
+        <SiteFooter />
+      </div>
     </div>
   );
 }

@@ -12,7 +12,9 @@ import {
   DELIVERY_LOCATIONS,
   DELIVERY_WINDOWS,
   ORDER_STATUSES,
+  PAYMENT_STATUSES,
   type OrderStatus,
+  type PaymentStatus,
 } from "@/lib/constants";
 import { claimAdmin } from "@/lib/admin.functions";
 
@@ -37,6 +39,7 @@ type OrderRow = {
   delivery_location: string;
   delivery_window: string;
   payment_method: string;
+  payment_status: PaymentStatus;
   additional_instructions: string;
   subtotal: number;
   total: number;
@@ -90,7 +93,7 @@ function AdminPage() {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, additional_instructions, subtotal, total, status, created_at, order_items(id, product_name, quantity, unit_price, subtotal)",
+          "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, payment_status, additional_instructions, subtotal, total, status, created_at, order_items(id, product_name, quantity, unit_price, subtotal)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -108,6 +111,21 @@ function AdminPage() {
       void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
     },
     onError: () => toast.error("Could not update the order status."),
+  });
+
+  const updatePayment = useMutation({
+    mutationFn: async ({ id, paymentStatus }: { id: string; paymentStatus: PaymentStatus }) => {
+      const { error } = await supabase
+        .from("orders")
+        .update({ payment_status: paymentStatus })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Payment status updated");
+      void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: () => toast.error("Could not update the payment status."),
   });
 
   const orders = ordersQuery.data ?? [];
@@ -299,13 +317,22 @@ function AdminPage() {
                     <Line label="Location" value={order.delivery_location} />
                     <Line label="Delivery" value={order.delivery_window} />
                     <Line label="Payment" value={order.payment_method} />
+                    <Line label="Payment status" value={order.payment_status} />
                     <Line label="Total" value={formatCedis(Number(order.total))} />
                   </dl>
                   <OrderItems order={order} />
+                  <Instructions order={order} />
                   <StatusSelect
                     order={order}
                     onChange={(status) => updateStatus.mutate({ id: order.id, status })}
                   />
+                  <PaymentStatusSelect
+                    order={order}
+                    onChange={(paymentStatus) =>
+                      updatePayment.mutate({ id: order.id, paymentStatus })
+                    }
+                  />
+
                 </li>
               ))}
             </ul>
@@ -320,6 +347,7 @@ function AdminPage() {
                     <th className="px-4 py-3">Location</th>
                     <th className="px-4 py-3">Delivery</th>
                     <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-3">Payment status</th>
                     <th className="px-4 py-3">Total</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
@@ -348,6 +376,14 @@ function AdminPage() {
                         <td className="px-4 py-3">{order.delivery_location}</td>
                         <td className="px-4 py-3">{order.delivery_window}</td>
                         <td className="px-4 py-3">{order.payment_method}</td>
+                        <td className="px-4 py-3">
+                          <PaymentStatusSelect
+                            order={order}
+                            onChange={(paymentStatus) =>
+                              updatePayment.mutate({ id: order.id, paymentStatus })
+                            }
+                          />
+                        </td>
                         <td className="px-4 py-3 font-semibold">
                           {formatCedis(Number(order.total))}
                         </td>
@@ -360,14 +396,9 @@ function AdminPage() {
                       </tr>
                       {expanded === order.id ? (
                         <tr>
-                          <td colSpan={7} className="bg-secondary/40 px-4 py-3">
+                          <td colSpan={8} className="bg-secondary/40 px-4 py-3">
                             <OrderItems order={order} />
-                            {order.additional_instructions ? (
-                              <p className="mt-2 text-sm">
-                                <span className="font-semibold">Instructions:</span>{" "}
-                                {order.additional_instructions}
-                              </p>
-                            ) : null}
+                            <Instructions order={order} />
                           </td>
                         </tr>
                       ) : null}
@@ -444,5 +475,39 @@ function StatusSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+function PaymentStatusSelect({
+  order,
+  onChange,
+}: {
+  order: OrderRow;
+  onChange: (paymentStatus: PaymentStatus) => void;
+}) {
+  return (
+    <select
+      aria-label={`Payment status for order ${order.order_number}`}
+      className={`${selectClass} mt-3 lg:mt-0 lg:w-36`}
+      value={order.payment_status}
+      onChange={(e) => onChange(e.target.value as PaymentStatus)}
+    >
+      {PAYMENT_STATUSES.map((status) => (
+        <option key={status} value={status}>
+          {status}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function Instructions({ order }: { order: OrderRow }) {
+  return (
+    <div className="mt-3 rounded-xl border border-border p-3 text-sm">
+      <p className="font-semibold">Additional Delivery Instructions</p>
+      <p className="mt-1 text-muted-foreground">
+        {order.additional_instructions?.trim() ? order.additional_instructions : "None provided"}
+      </p>
+    </div>
   );
 }
