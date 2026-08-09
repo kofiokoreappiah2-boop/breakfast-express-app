@@ -347,6 +347,7 @@ function AdminPage() {
                     <th className="px-4 py-3">Location</th>
                     <th className="px-4 py-3">Delivery</th>
                     <th className="px-4 py-3">Payment</th>
+                    <th className="px-4 py-3">Payment status</th>
                     <th className="px-4 py-3">Total</th>
                     <th className="px-4 py-3">Status</th>
                   </tr>
