@@ -317,13 +317,22 @@ function AdminPage() {
                     <Line label="Location" value={order.delivery_location} />
                     <Line label="Delivery" value={order.delivery_window} />
                     <Line label="Payment" value={order.payment_method} />
+                    <Line label="Payment status" value={order.payment_status} />
                     <Line label="Total" value={formatCedis(Number(order.total))} />
                   </dl>
                   <OrderItems order={order} />
+                  <Instructions order={order} />
                   <StatusSelect
                     order={order}
                     onChange={(status) => updateStatus.mutate({ id: order.id, status })}
                   />
+                  <PaymentStatusSelect
+                    order={order}
+                    onChange={(paymentStatus) =>
+                      updatePayment.mutate({ id: order.id, paymentStatus })
+                    }
+                  />
+
                 </li>
               ))}
             </ul>
