@@ -31,9 +31,46 @@ function ConfirmationPage() {
     setReady(true);
   }, []);
 
+  function buildPlainText(r: StoredReceipt): string {
+    const lines = [
+      `${BUSINESS.name} — Order #${r.orderNumber}`,
+      `Name: ${r.customerName}`,
+      `Phone: ${r.customerPhone}`,
+      `Delivery location: ${r.deliveryLocation}`,
+      `Delivery window: ${r.deliveryWindow}`,
+      `Payment method: ${r.paymentMethod}`,
+      `Payment status: ${r.paymentStatus}`,
+      `Instructions: ${r.additionalInstructions || "None"}`,
+      "Items:",
+      ...r.items.map(
+        (i) =>
+          `  - ${i.name}${i.size ? ` (${i.size})` : ""} x${i.quantity} = ${formatCedis(i.subtotal)}`,
+      ),
+      `Total: ${formatCedis(r.total)}`,
+    ];
+    return lines.join("\n");
+  }
+
+  async function shareOrder() {
+    if (!receipt) return;
+    const text = buildPlainText(receipt);
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: `Order #${receipt.orderNumber}`, text });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      toast.success("Order details copied to your clipboard.");
+    } catch {
+      // User cancelled the share sheet — nothing to report.
+    }
+  }
+
   return (
     <div className="min-h-screen">
-      <SiteHeader />
+      <div className="print:hidden">
+        <SiteHeader />
+      </div>
       <main className="mx-auto max-w-2xl px-4 py-8">
         {!ready ? null : !receipt ? (
           <div className="surface-card p-8 text-center">
