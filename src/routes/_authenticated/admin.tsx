@@ -39,6 +39,7 @@ type OrderRow = {
   delivery_location: string;
   delivery_window: string;
   payment_method: string;
+  payment_status: PaymentStatus;
   additional_instructions: string;
   subtotal: number;
   total: number;
@@ -92,7 +93,7 @@ function AdminPage() {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, additional_instructions, subtotal, total, status, created_at, order_items(id, product_name, quantity, unit_price, subtotal)",
+          "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, payment_status, additional_instructions, subtotal, total, status, created_at, order_items(id, product_name, quantity, unit_price, subtotal)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -110,6 +111,21 @@ function AdminPage() {
       void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
     },
     onError: () => toast.error("Could not update the order status."),
+  });
+
+  const updatePayment = useMutation({
+    mutationFn: async ({ id, paymentStatus }: { id: string; paymentStatus: PaymentStatus }) => {
+      const { error } = await supabase
+        .from("orders")
+        .update({ payment_status: paymentStatus })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Payment status updated");
+      void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: () => toast.error("Could not update the payment status."),
   });
 
   const orders = ordersQuery.data ?? [];
