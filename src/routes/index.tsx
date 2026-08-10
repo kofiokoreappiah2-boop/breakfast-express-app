@@ -1,15 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { Clock, MapPin, Phone, ShoppingBag } from "lucide-react";
 
 import heroImage from "@/assets/hero-breakfast.jpg";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { ProductCard, type Product } from "@/components/ProductCard";
-import { supabase } from "@/integrations/supabase/client";
-import { BUSINESS, DELIVERY_LOCATIONS, DELIVERY_WINDOWS } from "@/lib/constants";
+import { ProductCard } from "@/components/ProductCard";
+import { BUSINESS } from "@/lib/constants";
 import { useCart } from "@/lib/cart";
 import { formatCedis } from "@/lib/format";
+import { useStorefront } from "@/lib/use-storefront";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,6 +24,8 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Your neighbourhood breakfast, made easy. Delivered to your hall.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: HomePage,
@@ -38,28 +39,38 @@ const STEPS = [
 
 function HomePage() {
   const { itemCount, total } = useCart();
+  const { data, isLoading } = useStorefront();
 
-  const { data: products, isLoading } = useQuery({
-    queryKey: ["products"],
-    queryFn: async (): Promise<Product[]> => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, description, size, price, available")
-        .eq("available", true)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((p) => ({ ...p, price: Number(p.price) }));
-    },
-  });
+  const settings = data?.settings;
+  const products = data?.products ?? [];
+  const locations = data?.locations ?? [];
+  const windows = data?.windows ?? [];
+  const businessName = settings?.businessName ?? BUSINESS.name;
+  const phone = settings?.contactPhone ?? BUSINESS.phone;
+  const whatsappUrl = settings?.whatsappNumber
+    ? `https://wa.me/${settings.whatsappNumber.replace(/\D/g, "")}`
+    : BUSINESS.whatsappUrl;
 
   return (
     <div className="min-h-screen pb-24">
       <SiteHeader />
 
+      {settings?.promoEnabled && settings.promoMessage ? (
+        <p className="warm-gradient px-4 py-2 text-center text-sm font-semibold text-primary-foreground">
+          {settings.promoMessage}
+        </p>
+      ) : null}
+
+      {settings && !settings.acceptingOrders ? (
+        <p className="border-b border-border bg-secondary px-4 py-3 text-center text-sm font-semibold">
+          {settings.closedMessage}
+        </p>
+      ) : null}
+
       <main>
         <section className="relative overflow-hidden">
           <img
-            src={heroImage}
+            src={settings?.heroImageUrl ?? heroImage}
             alt="A spread of Ghanaian breakfast: porridge, puff puff, koose and groundnuts"
             width={1200}
             height={912}
@@ -68,13 +79,13 @@ function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10" />
           <div className="relative mx-auto -mt-28 max-w-5xl px-4 pb-8 sm:-mt-36">
             <h1 className="font-display text-4xl font-bold leading-tight sm:text-6xl">
-              {BUSINESS.name}
+              {businessName}
             </h1>
             <p className="mt-2 text-lg font-semibold text-primary sm:text-2xl">
-              {BUSINESS.tagline}
+              {settings?.heroHeading ?? BUSINESS.tagline}
             </p>
             <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-              {BUSINESS.subTagline}
+              {settings?.heroSubheading ?? BUSINESS.subTagline}
             </p>
             <a
               href="#menu"
@@ -97,9 +108,13 @@ function HomePage() {
                 <div key={i} className="surface-card h-80 animate-pulse bg-muted" />
               ))}
             </div>
+          ) : products.length === 0 ? (
+            <p className="mt-6 text-sm text-muted-foreground">
+              No items are available right now. Please check back soon.
+            </p>
           ) : (
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {(products ?? []).map((product) => (
+              {products.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
@@ -128,7 +143,7 @@ function HomePage() {
                 <MapPin className="h-5 w-5 text-primary" aria-hidden="true" /> Delivery locations
               </h2>
               <ul className="mt-3 space-y-2 text-sm">
-                {DELIVERY_LOCATIONS.map((location) => (
+                {locations.map((location) => (
                   <li key={location} className="rounded-lg bg-secondary px-3 py-2 font-medium">
                     {location}
                   </li>
@@ -140,7 +155,7 @@ function HomePage() {
                 <Clock className="h-5 w-5 text-primary" aria-hidden="true" /> Delivery periods
               </h2>
               <ul className="mt-3 space-y-2 text-sm">
-                {DELIVERY_WINDOWS.map((window) => (
+                {windows.map((window) => (
                   <li key={window} className="rounded-lg bg-secondary px-3 py-2 font-medium">
                     {window}
                   </li>
@@ -154,15 +169,15 @@ function HomePage() {
           <div className="surface-card warm-gradient p-6 text-primary-foreground">
             <h2 className="font-display text-xl font-bold">Questions? Talk to us</h2>
             <p className="mt-1 text-sm opacity-90">
-              Call or WhatsApp {BUSINESS.name} any morning.
+              Call or WhatsApp {businessName} any morning.
             </p>
             <a
-              href={BUSINESS.whatsappUrl}
+              href={whatsappUrl}
               target="_blank"
               rel="noreferrer"
               className="mt-4 inline-flex h-12 items-center gap-2 rounded-xl bg-card px-5 text-base font-semibold text-foreground"
             >
-              <Phone className="h-5 w-5" aria-hidden="true" /> {BUSINESS.phone}
+              <Phone className="h-5 w-5" aria-hidden="true" /> {phone}
             </a>
           </div>
         </section>
