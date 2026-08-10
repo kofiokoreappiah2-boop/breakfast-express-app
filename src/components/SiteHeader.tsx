@@ -2,9 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { ShoppingBag } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { BUSINESS } from "@/lib/constants";
+import { useStorefront } from "@/lib/use-storefront";
 
 export function SiteHeader() {
   const { itemCount } = useCart();
+  const { data } = useStorefront();
+  const name = data?.settings.businessName ?? BUSINESS.name;
+  const parent = data?.settings.parentName ?? BUSINESS.parent;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
@@ -15,10 +19,10 @@ export function SiteHeader() {
           </span>
           <span className="min-w-0">
             <span className="block truncate font-display text-lg font-bold leading-tight">
-              {BUSINESS.name}
+              {name}
             </span>
             <span className="block truncate text-[11px] text-muted-foreground">
-              by {BUSINESS.parent}
+              by {parent}
             </span>
           </span>
         </Link>
