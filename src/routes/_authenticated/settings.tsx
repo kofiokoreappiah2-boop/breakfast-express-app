@@ -74,7 +74,7 @@ function ControlCenterPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Only staff accounts with administrator access can open the control center.
         </p>
-        <Link to="/_authenticated/admin" className={`${ghost} mt-6`}>
+        <Link to="/admin" className={`${ghost} mt-6`}>
           Back to orders
         </Link>
       </div>
@@ -95,7 +95,7 @@ function ControlCenterPage() {
               Menu, delivery, payments and homepage content.
             </p>
           </div>
-          <Link to="/_authenticated/admin" className={`${ghost} shrink-0`}>
+          <Link to="/admin" className={`${ghost} shrink-0`}>
             Orders
           </Link>
         </div>
