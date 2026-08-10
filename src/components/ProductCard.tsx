@@ -12,6 +12,7 @@ export type Product = {
   size: string | null;
   price: number;
   available: boolean;
+  imageUrl?: string | null;
 };
 
 export function ProductCard({ product }: { product: Product }) {
