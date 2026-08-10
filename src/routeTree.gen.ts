@@ -16,6 +16,7 @@ import { Route as CartRouteImport } from './routes/cart'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as OrderConfirmationRouteImport } from './routes/order-confirmation'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -51,6 +52,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,13 +85,27 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/auth' | '/cart' | '/checkout' | '/order-confirmation' | '/admin'
+    | '/'
+    | '/auth'
+    | '/cart'
+    | '/checkout'
+    | '/order-confirmation'
+    | '/admin'
+    | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/cart' | '/checkout' | '/order-confirmation' | '/admin'
+  to:
+    | '/'
+    | '/auth'
+    | '/cart'
+    | '/checkout'
+    | '/order-confirmation'
+    | '/admin'
+    | '/settings'
   id:
     | '__root__'
     | '/'
@@ -93,6 +115,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/order-confirmation'
     | '/_authenticated/admin'
+    | '/_authenticated/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -155,15 +178,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

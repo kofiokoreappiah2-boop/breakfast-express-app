@@ -1,10 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import {
-  DELIVERY_LOCATIONS,
-  DELIVERY_WINDOWS,
-  PAYMENT_METHODS,
-} from "@/lib/constants";
+import { PAYMENT_METHODS } from "@/lib/constants";
 import { buildOrderNotification } from "@/lib/notification";
 import { money } from "@/lib/format";
 
@@ -16,8 +12,8 @@ const orderSchema = z.object({
     .min(9, "Phone number is too short")
     .max(20)
     .regex(/^[0-9+\s-]+$/, "Phone number looks invalid"),
-  deliveryLocation: z.enum(DELIVERY_LOCATIONS),
-  deliveryWindow: z.enum(DELIVERY_WINDOWS),
+  deliveryLocation: z.string().trim().min(1).max(120),
+  deliveryWindow: z.string().trim().min(1).max(120),
   paymentMethod: z.enum(PAYMENT_METHODS),
   additionalInstructions: z.string().trim().max(500).default(""),
   items: z
@@ -27,16 +23,121 @@ const orderSchema = z.object({
         quantity: z.number().int().min(1).max(100),
       }),
     )
-    .min(1, "Your cart is empty"),
+    .min(1, "Your cart is empty")
+    .max(30),
 });
 
 export type CreateOrderInput = z.input<typeof orderSchema>;
+
+const BUSY_MESSAGE =
+  "We're unable to process this order right now. Please wait a moment and try again.";
 
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => orderSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { getRequestHeader } = await import("@tanstack/react-start/server");
 
+    // --- Server-side throttle (never trusts the browser) ---------------------
+    const forwarded = getRequestHeader("x-forwarded-for") ?? "";
+    const ip =
+      forwarded.split(",")[0]?.trim() ||
+      getRequestHeader("cf-connecting-ip") ||
+      getRequestHeader("x-real-ip") ||
+      "unknown";
+    const phoneKey = data.customerPhone.replace(/\D/g, "");
+    const keys = [`ip:${ip}`, `phone:${phoneKey}`];
+
+    const since10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const since60 = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    const [{ count: recent }, { count: hourly }] = await Promise.all([
+      supabaseAdmin
+        .from("checkout_throttle")
+        .select("id", { count: "exact", head: true })
+        .in("client_key", keys)
+        .gte("created_at", since10),
+      supabaseAdmin
+        .from("checkout_throttle")
+        .select("id", { count: "exact", head: true })
+        .in("client_key", keys)
+        .gte("created_at", since60),
+    ]);
+
+    if ((recent ?? 0) >= 5 || (hourly ?? 0) >= 15) {
+      throw new Error(BUSY_MESSAGE);
+    }
+
+    await supabaseAdmin
+      .from("checkout_throttle")
+      .insert(keys.map((client_key) => ({ client_key })));
+    // Housekeeping: drop records older than a day.
+    void supabaseAdmin
+      .from("checkout_throttle")
+      .delete()
+      .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+    // --- Business availability ----------------------------------------------
+    const { data: settings } = await supabaseAdmin
+      .from("business_settings")
+      .select(
+        "accepting_orders, closed_message, momo_enabled, pod_enabled, momo_number, momo_account_name",
+      )
+      .eq("id", true)
+      .maybeSingle();
+
+    if (settings && !settings.accepting_orders) {
+      throw new Error(
+        settings.closed_message ||
+          "We're currently not accepting orders. Please check back later.",
+      );
+    }
+
+    if (data.paymentMethod === "Mobile Money" && settings && !settings.momo_enabled) {
+      throw new Error("Mobile Money is unavailable right now. Please choose another option.");
+    }
+    if (data.paymentMethod === "Payment on Delivery" && settings && !settings.pod_enabled) {
+      throw new Error(
+        "Payment on delivery is unavailable right now. Please choose another option.",
+      );
+    }
+
+    // --- Delivery location / window must currently be active -----------------
+    const today = new Date().toISOString().slice(0, 10);
+    const [locationRes, windowRes] = await Promise.all([
+      supabaseAdmin
+        .from("delivery_locations")
+        .select("id")
+        .eq("name", data.deliveryLocation)
+        .eq("active", true)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("delivery_windows")
+        .select("id")
+        .eq("label", data.deliveryWindow)
+        .eq("active", true)
+        .maybeSingle(),
+    ]);
+
+    if (!locationRes.data) {
+      throw new Error("That delivery location isn't available. Please choose another one.");
+    }
+    if (!windowRes.data) {
+      throw new Error("That delivery period isn't available. Please choose another one.");
+    }
+
+    const { data: exception } = await supabaseAdmin
+      .from("delivery_window_exceptions")
+      .select("available")
+      .eq("window_id", windowRes.data.id)
+      .eq("exception_date", today)
+      .maybeSingle();
+
+    if (exception && !exception.available) {
+      throw new Error("That delivery period isn't available today. Please choose another one.");
+    }
+
+    // --- Pricing (always from the database) ----------------------------------
     const ids = [...new Set(data.items.map((i) => i.productId))];
     const { data: products, error: productError } = await supabaseAdmin
       .from("products")
@@ -76,7 +177,9 @@ export const createOrder = createServerFn({ method: "POST" })
         subtotal,
         total: subtotal,
       })
-      .select("id, order_number, subtotal, total, created_at, payment_status, additional_instructions")
+      .select(
+        "id, order_number, subtotal, total, created_at, payment_status, additional_instructions",
+      )
       .single();
 
     if (orderError || !order) throw new Error("We couldn't place your order. Please try again.");

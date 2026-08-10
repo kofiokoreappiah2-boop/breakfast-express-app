@@ -7,12 +7,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { useCart } from "@/lib/cart";
 import { formatCedis } from "@/lib/format";
-import {
-  BUSINESS,
-  DELIVERY_LOCATIONS,
-  DELIVERY_WINDOWS,
-  PAYMENT_METHODS,
-} from "@/lib/constants";
+import { BUSINESS, PAYMENT_METHODS, type PaymentMethod } from "@/lib/constants";
+import { useStorefront } from "@/lib/use-storefront";
 import { createOrder } from "@/lib/orders.functions";
 import { RECEIPT_STORAGE_KEY } from "@/lib/receipt";
 
@@ -40,6 +36,16 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const { items, subtotal, total, clearCart } = useCart();
   const submitOrder = useServerFn(createOrder);
+  const { data: storefront } = useStorefront();
+  const settings = storefront?.settings;
+  const locations = storefront?.locations ?? [];
+  const windows = storefront?.windows ?? [];
+  const paymentMethods: PaymentMethod[] = PAYMENT_METHODS.filter((method) =>
+    method === "Mobile Money"
+      ? (settings?.momoEnabled ?? true)
+      : (settings?.podEnabled ?? true),
+  );
+  const acceptingOrders = settings?.acceptingOrders ?? true;
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -75,9 +81,9 @@ function CheckoutPage() {
         data: {
           customerName: name.trim(),
           customerPhone: phone.trim(),
-          deliveryLocation: location as (typeof DELIVERY_LOCATIONS)[number],
-          deliveryWindow: window_ as (typeof DELIVERY_WINDOWS)[number],
-          paymentMethod: payment as (typeof PAYMENT_METHODS)[number],
+          deliveryLocation: location,
+          deliveryWindow: window_,
+          paymentMethod: payment as PaymentMethod,
           additionalInstructions: instructions.trim(),
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
         },
@@ -100,7 +106,20 @@ function CheckoutPage() {
       <main className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="font-display text-3xl font-bold">Checkout</h1>
 
-        {items.length === 0 ? (
+        {!acceptingOrders ? (
+          <div className="surface-card mt-6 p-8 text-center">
+            <p className="font-semibold">
+              {settings?.closedMessage ??
+                "We're currently not accepting orders. Please check back later."}
+            </p>
+            <Link
+              to="/"
+              className="mt-5 inline-flex h-12 items-center rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground"
+            >
+              Back to menu
+            </Link>
+          </div>
+        ) : items.length === 0 ? (
           <div className="surface-card mt-6 p-8 text-center">
             <p className="font-medium">You need at least one item to check out.</p>
             <Link
@@ -148,7 +167,7 @@ function CheckoutPage() {
                   onChange={(e) => setLocation(e.target.value)}
                 >
                   <option value="">Select your hall</option>
-                  {DELIVERY_LOCATIONS.map((option) => (
+                  {locations.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>
@@ -164,7 +183,7 @@ function CheckoutPage() {
                   onChange={(e) => setWindow(e.target.value)}
                 >
                   <option value="">Select a delivery period</option>
-                  {DELIVERY_WINDOWS.map((option) => (
+                  {windows.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>
@@ -194,7 +213,7 @@ function CheckoutPage() {
                 <p className="text-sm font-medium text-destructive">{errors["payment"]}</p>
               ) : null}
               <div className="space-y-2">
-                {PAYMENT_METHODS.map((method) => (
+                {paymentMethods.map((method) => (
                   <label
                     key={method}
                     className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-colors ${
@@ -220,10 +239,13 @@ function CheckoutPage() {
                 <div className="rounded-xl bg-secondary p-4 text-sm">
                   <p className="font-semibold">Send your payment to:</p>
                   <p className="mt-2">
-                    MoMo Number: <span className="font-bold">{BUSINESS.momoNumber}</span>
+                    MoMo Number:{" "}
+                    <span className="font-bold">{settings?.momoNumber ?? BUSINESS.momoNumber}</span>
                   </p>
                   <p>
-                    Account Name: <span className="font-bold">{BUSINESS.momoAccountName}</span>
+                    Account Name: <span className="font-bold">
+                      {settings?.momoAccountName ?? BUSINESS.momoAccountName}
+                    </span>
                   </p>
                   <p className="mt-2 text-muted-foreground">
                     Payment is confirmed manually for now — place the order, then send the money.

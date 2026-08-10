@@ -17,6 +17,7 @@ import {
   type PaymentStatus,
 } from "@/lib/constants";
 import { claimAdmin } from "@/lib/admin.functions";
+import { getOrderHistory } from "@/lib/control-center.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -109,6 +110,7 @@ function AdminPage() {
     onSuccess: () => {
       toast.success("Order status updated");
       void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["order-history"] });
     },
     onError: () => toast.error("Could not update the order status."),
   });
@@ -124,6 +126,7 @@ function AdminPage() {
     onSuccess: () => {
       toast.success("Payment status updated");
       void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["order-history"] });
     },
     onError: () => toast.error("Could not update the payment status."),
   });
@@ -205,7 +208,13 @@ function AdminPage() {
               Back to {BUSINESS.name} store
             </Link>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              to="/settings"
+              className="inline-flex h-11 items-center rounded-xl border border-border px-3 text-sm font-medium"
+            >
+              Control center
+            </Link>
             <button
               type="button"
               onClick={() => void ordersQuery.refetch()}
@@ -322,6 +331,7 @@ function AdminPage() {
                   </dl>
                   <OrderItems order={order} />
                   <Instructions order={order} />
+                  <OrderHistory orderId={order.id} />
                   <StatusSelect
                     order={order}
                     onChange={(status) => updateStatus.mutate({ id: order.id, status })}
@@ -399,6 +409,7 @@ function AdminPage() {
                           <td colSpan={8} className="bg-secondary/40 px-4 py-3">
                             <OrderItems order={order} />
                             <Instructions order={order} />
+                            <OrderHistory orderId={order.id} />
                           </td>
                         </tr>
                       ) : null}
@@ -498,6 +509,38 @@ function PaymentStatusSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+function OrderHistory({ orderId }: { orderId: string }) {
+  const load = useServerFn(getOrderHistory);
+  const history = useQuery({
+    queryKey: ["order-history", orderId],
+    queryFn: () => load({ data: { id: orderId } }),
+  });
+
+  return (
+    <div className="mt-3 rounded-xl border border-border p-3 text-sm">
+      <p className="font-semibold">Change history</p>
+      {history.isLoading ? (
+        <p className="mt-1 text-muted-foreground">Loading history…</p>
+      ) : (history.data?.length ?? 0) === 0 ? (
+        <p className="mt-1 text-muted-foreground">No staff changes recorded yet.</p>
+      ) : (
+        <ul className="mt-2 space-y-1">
+          {history.data?.map((entry) => (
+            <li key={entry.id} className="text-muted-foreground">
+              <span className="font-medium text-foreground">
+                {entry.actionType === "payment_status" ? "Payment status" : "Order status"}
+              </span>{" "}
+              {entry.previousValue ?? "—"} → {entry.newValue ?? "—"} ·{" "}
+              {new Date(entry.createdAt).toLocaleString()}
+              {entry.staffEmail ? ` · ${entry.staffEmail}` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

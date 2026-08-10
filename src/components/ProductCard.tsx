@@ -12,6 +12,7 @@ export type Product = {
   size: string | null;
   price: number;
   available: boolean;
+  imageUrl?: string | null;
 };
 
 export function ProductCard({ product }: { product: Product }) {
@@ -22,7 +23,7 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <article className="surface-card flex flex-col overflow-hidden">
       <img
-        src={productImage(product.name)}
+        src={product.imageUrl ?? productImage(product.name)}
         alt={label}
         loading="lazy"
         width={800}

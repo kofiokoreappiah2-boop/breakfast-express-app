@@ -14,6 +14,217 @@ export type Database = {
   }
   public: {
     Tables: {
+      business_settings: {
+        Row: {
+          accepting_orders: boolean
+          business_name: string
+          closed_message: string
+          contact_phone: string
+          hero_heading: string
+          hero_image_path: string | null
+          hero_subheading: string
+          id: boolean
+          momo_account_name: string
+          momo_enabled: boolean
+          momo_number: string
+          parent_name: string
+          pod_enabled: boolean
+          promo_enabled: boolean
+          promo_message: string
+          updated_at: string
+          whatsapp_number: string
+        }
+        Insert: {
+          accepting_orders?: boolean
+          business_name?: string
+          closed_message?: string
+          contact_phone?: string
+          hero_heading?: string
+          hero_image_path?: string | null
+          hero_subheading?: string
+          id?: boolean
+          momo_account_name?: string
+          momo_enabled?: boolean
+          momo_number?: string
+          parent_name?: string
+          pod_enabled?: boolean
+          promo_enabled?: boolean
+          promo_message?: string
+          updated_at?: string
+          whatsapp_number?: string
+        }
+        Update: {
+          accepting_orders?: boolean
+          business_name?: string
+          closed_message?: string
+          contact_phone?: string
+          hero_heading?: string
+          hero_image_path?: string | null
+          hero_subheading?: string
+          id?: boolean
+          momo_account_name?: string
+          momo_enabled?: boolean
+          momo_number?: string
+          parent_name?: string
+          pod_enabled?: boolean
+          promo_enabled?: boolean
+          promo_message?: string
+          updated_at?: string
+          whatsapp_number?: string
+        }
+        Relationships: []
+      }
+      checkout_throttle: {
+        Row: {
+          client_key: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          client_key: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          client_key?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      delivery_locations: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      delivery_window_exceptions: {
+        Row: {
+          available: boolean
+          created_at: string
+          exception_date: string
+          id: string
+          note: string
+          window_id: string
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          exception_date: string
+          id?: string
+          note?: string
+          window_id: string
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          exception_date?: string
+          id?: string
+          note?: string
+          window_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_window_exceptions_window_id_fkey"
+            columns: ["window_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_windows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_windows: {
+        Row: {
+          active: boolean
+          created_at: string
+          end_time: string
+          id: string
+          label: string
+          sort_order: number
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          end_time: string
+          id?: string
+          label: string
+          sort_order?: number
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          end_time?: string
+          id?: string
+          label?: string
+          sort_order?: number
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      order_audit_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          new_value: string | null
+          order_id: string
+          previous_value: string | null
+          staff_user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          new_value?: string | null
+          order_id: string
+          previous_value?: string | null
+          staff_user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          new_value?: string | null
+          order_id?: string
+          previous_value?: string | null
+          staff_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_audit_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string
@@ -116,30 +327,36 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          image_path: string | null
           name: string
           price: number
           size: string | null
           sort_order: number
+          updated_at: string
         }
         Insert: {
           available?: boolean
           created_at?: string
           description?: string
           id?: string
+          image_path?: string | null
           name: string
           price: number
           size?: string | null
           sort_order?: number
+          updated_at?: string
         }
         Update: {
           available?: boolean
           created_at?: string
           description?: string
           id?: string
+          image_path?: string | null
           name?: string
           price?: number
           size?: string | null
           sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
