@@ -1,58 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-
-async function assertAdmin(context: { supabase: any; userId: string }) {
-  const { data, error } = await context.supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", context.userId)
-    .eq("role", "admin")
-    .maybeSingle();
-  if (error || !data) throw new Error("Administrator access required.");
-}
-
-const productSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().trim().min(1).max(80),
-  description: z.string().trim().max(300).default(""),
-  size: z.string().trim().max(40).nullable().default(null),
-  price: z.number().min(0).max(100000),
-  available: z.boolean(),
-  sortOrder: z.number().int().min(0).max(9999),
-});
-
-const locationSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().trim().min(1).max(120),
-  active: z.boolean(),
-  sortOrder: z.number().int().min(0).max(9999),
-});
-
-const windowSchema = z.object({
-  id: z.string().uuid().optional(),
-  label: z.string().trim().min(1).max(120),
-  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
-  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
-  active: z.boolean(),
-  sortOrder: z.number().int().min(0).max(9999),
-});
-
-const settingsSchema = z.object({
-  acceptingOrders: z.boolean(),
-  closedMessage: z.string().trim().max(300),
-  businessName: z.string().trim().min(1).max(120),
-  parentName: z.string().trim().max(120),
-  contactPhone: z.string().trim().max(30),
-  whatsappNumber: z.string().trim().max(30),
-  momoEnabled: z.boolean(),
-  momoNumber: z.string().trim().max(30),
-  momoAccountName: z.string().trim().max(120),
-  podEnabled: z.boolean(),
-  heroHeading: z.string().trim().max(160),
-  heroSubheading: z.string().trim().max(240),
-  promoEnabled: z.boolean(),
-  promoMessage: z.string().trim().max(240),
-});
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  idSchema,
+  imageUploadSchema,
+  locationSchema,
+  productSchema,
+  settingsSchema,
+  windowExceptionSchema,
+  windowSchema,
+} from "@/lib/control-center.schemas";
 
 export type AdminProduct = {
   id: string;
@@ -66,6 +22,7 @@ export type AdminProduct = {
 };
 
 export type AdminLocation = { id: string; name: string; active: boolean; sortOrder: number };
+
 export type AdminWindow = {
   id: string;
   label: string;
@@ -76,23 +33,28 @@ export type AdminWindow = {
   exceptions: { id: string; date: string; available: boolean; note: string }[];
 };
 
+export type AuditEntry = {
+  id: string;
+  actionType: string;
+  previousValue: string | null;
+  newValue: string | null;
+  createdAt: string;
+  staffEmail: string | null;
+};
+
 /** Admin: everything the Business Control Center renders. */
 export const getControlCenter = createServerFn({ method: "GET" })
-  .middleware([
-    (await import("@/integrations/supabase/auth-middleware")).requireSupabaseAuth,
-  ])
+  .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context as any);
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { signImagePaths } = await import("@/lib/images.server");
 
     const [settingsRes, productsRes, locationsRes, windowsRes, exceptionsRes] = await Promise.all([
       supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
       supabaseAdmin.from("products").select("*").order("sort_order", { ascending: true }),
-      supabaseAdmin
-        .from("delivery_locations")
-        .select("*")
-        .order("sort_order", { ascending: true }),
+      supabaseAdmin.from("delivery_locations").select("*").order("sort_order", { ascending: true }),
       supabaseAdmin.from("delivery_windows").select("*").order("sort_order", { ascending: true }),
       supabaseAdmin
         .from("delivery_window_exceptions")
@@ -137,12 +99,7 @@ export const getControlCenter = createServerFn({ method: "GET" })
         }),
       ),
       locations: (locationsRes.data ?? []).map(
-        (l): AdminLocation => ({
-          id: l.id,
-          name: l.name,
-          active: l.active,
-          sortOrder: l.sort_order,
-        }),
+        (l): AdminLocation => ({ id: l.id, name: l.name, active: l.active, sortOrder: l.sort_order }),
       ),
       windows: (windowsRes.data ?? []).map(
         (w): AdminWindow => ({
@@ -154,15 +111,240 @@ export const getControlCenter = createServerFn({ method: "GET" })
           sortOrder: w.sort_order,
           exceptions: (exceptionsRes.data ?? [])
             .filter((e) => e.window_id === w.id)
-            .map((e) => ({
-              id: e.id,
-              date: e.exception_date,
-              available: e.available,
-              note: e.note,
-            })),
+            .map((e) => ({ id: e.id, date: e.exception_date, available: e.available, note: e.note })),
         }),
       ),
     };
+  });
+
+export const saveBusinessSettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => settingsSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("business_settings")
+      .update({
+        accepting_orders: data.acceptingOrders,
+        closed_message: data.closedMessage,
+        business_name: data.businessName,
+        parent_name: data.parentName,
+        contact_phone: data.contactPhone,
+        whatsapp_number: data.whatsappNumber,
+        momo_enabled: data.momoEnabled,
+        momo_number: data.momoNumber,
+        momo_account_name: data.momoAccountName,
+        pod_enabled: data.podEnabled,
+        hero_heading: data.heroHeading,
+        hero_subheading: data.heroSubheading,
+        promo_enabled: data.promoEnabled,
+        promo_message: data.promoMessage,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", true);
+
+    if (error) throw new Error("Could not save the business settings.");
+    return { ok: true };
+  });
+
+export const saveProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => productSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const row = {
+      name: data.name,
+      description: data.description ?? "",
+      size: data.size && data.size.length > 0 ? data.size : null,
+      price: data.price,
+      available: data.available,
+      sort_order: data.sortOrder,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = data.id
+      ? await supabaseAdmin.from("products").update(row).eq("id", data.id)
+      : await supabaseAdmin.from("products").insert(row);
+
+    if (error) throw new Error("Could not save the menu item.");
+    return { ok: true };
+  });
+
+export const deleteProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => idSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Past orders keep their own copy of the name and price, so removing a
+    // product never rewrites history; we only hide it from the storefront.
+    const { error } = await supabaseAdmin
+      .from("products")
+      .update({ available: false, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error("Could not remove the menu item.");
+    return { ok: true };
+  });
+
+export const uploadImage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => imageUploadSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin, storeImage, removeImage } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (data.target === "product") {
+      if (!data.productId) throw new Error("Choose a menu item first.");
+      const { data: existing } = await supabaseAdmin
+        .from("products")
+        .select("image_path")
+        .eq("id", data.productId)
+        .maybeSingle();
+      const path = await storeImage("products", data.fileName, data.contentType, data.base64);
+      const { error } = await supabaseAdmin
+        .from("products")
+        .update({ image_path: path, updated_at: new Date().toISOString() })
+        .eq("id", data.productId);
+      if (error) throw new Error("Could not attach the image.");
+      await removeImage(existing?.image_path);
+      return { ok: true };
+    }
+
+    const { data: settings } = await supabaseAdmin
+      .from("business_settings")
+      .select("hero_image_path")
+      .eq("id", true)
+      .maybeSingle();
+    const path = await storeImage("hero", data.fileName, data.contentType, data.base64);
+    const { error } = await supabaseAdmin
+      .from("business_settings")
+      .update({ hero_image_path: path, updated_at: new Date().toISOString() })
+      .eq("id", true);
+    if (error) throw new Error("Could not update the homepage image.");
+    await removeImage(settings?.hero_image_path);
+    return { ok: true };
+  });
+
+export const saveLocation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => locationSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const row = {
+      name: data.name,
+      active: data.active,
+      sort_order: data.sortOrder,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = data.id
+      ? await supabaseAdmin.from("delivery_locations").update(row).eq("id", data.id)
+      : await supabaseAdmin.from("delivery_locations").insert(row);
+    if (error) throw new Error("Could not save the delivery location.");
+    return { ok: true };
+  });
+
+export const saveWindow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => windowSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const row = {
+      label: data.label,
+      start_time: data.startTime,
+      end_time: data.endTime,
+      active: data.active,
+      sort_order: data.sortOrder,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = data.id
+      ? await supabaseAdmin.from("delivery_windows").update(row).eq("id", data.id)
+      : await supabaseAdmin.from("delivery_windows").insert(row);
+    if (error) throw new Error("Could not save the delivery period.");
+    return { ok: true };
+  });
+
+export const saveWindowException = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => windowExceptionSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin.from("delivery_window_exceptions").upsert(
+      {
+        window_id: data.windowId,
+        exception_date: data.date,
+        available: data.available,
+        note: data.note ?? "",
+      },
+      { onConflict: "window_id,exception_date" },
+    );
+    if (error) throw new Error("Could not save the date exception.");
+    return { ok: true };
+  });
+
+export const deleteWindowException = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => idSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("delivery_window_exceptions")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error("Could not remove the date exception.");
+    return { ok: true };
+  });
+
+/** Admin: change history for one order. */
+export const getOrderHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => idSchema.parse(data))
+  .handler(async ({ data, context }): Promise<AuditEntry[]> => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("order_audit_log")
+      .select("id, action_type, previous_value, new_value, created_at, staff_user_id")
+      .eq("order_id", data.id)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error("Could not load the order history.");
+
+    const staffIds = [...new Set((rows ?? []).map((r) => r.staff_user_id).filter(Boolean))];
+    const emails = new Map<string, string>();
+    for (const id of staffIds) {
+      const { data: user } = await supabaseAdmin.auth.admin.getUserById(id as string);
+      if (user?.user?.email) emails.set(id as string, user.user.email);
+    }
+
+    return (rows ?? []).map((r) => ({
+      id: r.id,
+      actionType: r.action_type,
+      previousValue: r.previous_value,
+      newValue: r.new_value,
+      createdAt: r.created_at,
+      staffEmail: r.staff_user_id ? (emails.get(r.staff_user_id) ?? null) : null,
+    }));
   });
 
 export type ControlCenterData = Awaited<ReturnType<typeof getControlCenter>>;
