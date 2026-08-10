@@ -110,6 +110,7 @@ function AdminPage() {
     onSuccess: () => {
       toast.success("Order status updated");
       void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["order-history"] });
     },
     onError: () => toast.error("Could not update the order status."),
   });
@@ -125,6 +126,7 @@ function AdminPage() {
     onSuccess: () => {
       toast.success("Payment status updated");
       void queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["order-history"] });
     },
     onError: () => toast.error("Could not update the payment status."),
   });
