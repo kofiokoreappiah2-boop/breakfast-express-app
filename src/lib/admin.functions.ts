@@ -21,7 +21,7 @@ export const claimAdmin = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("user_roles").insert({
       user_id: context.userId,
       role: "owner",
-      email: context.claims?.["email"] as string | undefined,
+      email: (context.claims?.["email"] as string | undefined) ?? null,
       active: true,
     });
 
