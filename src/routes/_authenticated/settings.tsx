@@ -108,6 +108,8 @@ function ControlCenterPage() {
         <MenuSection products={data.products} onSaved={refresh} />
         <LocationsSection locations={data.locations} onSaved={refresh} />
         <WindowsSection windows={data.windows} onSaved={refresh} />
+        <StaffSection />
+
       </main>
     </div>
   );
