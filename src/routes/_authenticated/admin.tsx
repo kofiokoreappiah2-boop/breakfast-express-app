@@ -205,12 +205,15 @@ function AdminPage() {
             </Link>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Link
-              to="/settings"
-              className="inline-flex h-11 items-center rounded-xl border border-border px-3 text-sm font-medium"
-            >
-              Control center
-            </Link>
+            {isOwner ? (
+              <Link
+                to="/settings"
+                className="inline-flex h-11 items-center rounded-xl border border-border px-3 text-sm font-medium"
+              >
+                Control center
+              </Link>
+            ) : null}
+
             <button
               type="button"
               onClick={() => void ordersQuery.refetch()}
