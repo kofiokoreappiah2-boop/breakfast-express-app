@@ -17,7 +17,9 @@ import {
   type PaymentStatus,
 } from "@/lib/constants";
 import { claimAdmin } from "@/lib/admin.functions";
+import { getMyAccess } from "@/lib/staff.functions";
 import { getOrderHistory } from "@/lib/control-center.functions";
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -69,27 +71,19 @@ function AdminPage() {
   const [todayOnly, setTodayOnly] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  const loadAccess = useServerFn(getMyAccess);
   const rolesQuery = useQuery({
-    queryKey: ["admin-role"],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return false;
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userData.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      if (error) throw error;
-      return !!data;
-    },
+    queryKey: ["my-access"],
+    queryFn: () => loadAccess({}),
   });
 
-  const isAdmin = rolesQuery.data === true;
+  const isStaff = rolesQuery.data?.isStaff === true;
+  const isOwner = rolesQuery.data?.isOwner === true;
 
   const ordersQuery = useQuery({
     queryKey: ["admin-orders"],
-    enabled: isAdmin,
+    enabled: isStaff,
+
     queryFn: async (): Promise<OrderRow[]> => {
       const { data, error } = await supabase
         .from("orders")
@@ -160,31 +154,33 @@ function AdminPage() {
     return <p className="p-8 text-center text-muted-foreground">Checking your access…</p>;
   }
 
-  if (!isAdmin) {
+  if (!isStaff) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-display text-2xl font-bold">Administrator access required</h1>
+        <h1 className="font-display text-2xl font-bold">Staff access required</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your account isn't an administrator yet. If you are the {BUSINESS.name} owner setting up
-          the store for the first time, you can claim the administrator role now.
+          Your account doesn't have access yet. If you are the {BUSINESS.name} owner setting up the
+          store for the first time, you can claim owner access now. Otherwise ask the owner to
+          invite you from the control center.
         </p>
         <button
           type="button"
           onClick={async () => {
             try {
               await claim({});
-              toast.success("You are now the administrator.");
+              toast.success("You are now the owner.");
               void rolesQuery.refetch();
             } catch (error) {
               toast.error(
-                error instanceof Error ? error.message : "Could not grant administrator access.",
+                error instanceof Error ? error.message : "Could not grant owner access.",
               );
             }
           }}
           className="mt-6 h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground"
         >
-          Claim administrator access
+          Claim owner access
         </button>
+
         <button
           type="button"
           onClick={signOut}
@@ -209,12 +205,15 @@ function AdminPage() {
             </Link>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Link
-              to="/settings"
-              className="inline-flex h-11 items-center rounded-xl border border-border px-3 text-sm font-medium"
-            >
-              Control center
-            </Link>
+            {isOwner ? (
+              <Link
+                to="/settings"
+                className="inline-flex h-11 items-center rounded-xl border border-border px-3 text-sm font-medium"
+              >
+                Control center
+              </Link>
+            ) : null}
+
             <button
               type="button"
               onClick={() => void ordersQuery.refetch()}

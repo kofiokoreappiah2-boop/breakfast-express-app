@@ -19,6 +19,8 @@ import {
   type AdminWindow,
   type ControlCenterData,
 } from "@/lib/control-center.functions";
+import { inviteStaff, listStaff, updateStaff } from "@/lib/staff.functions";
+import type { StaffRole } from "@/lib/staff.schemas";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -70,10 +72,12 @@ function ControlCenterPage() {
   if (query.error || !query.data) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-display text-2xl font-bold">Administrator access required</h1>
+        <h1 className="font-display text-2xl font-bold">Owner access required</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Only staff accounts with administrator access can open the control center.
+          Only owner accounts can open the control center. Staff accounts can manage orders and
+          payment status from the order dashboard.
         </p>
+
         <Link to="/admin" className={`${ghost} mt-6`}>
           Back to orders
         </Link>
@@ -106,6 +110,8 @@ function ControlCenterPage() {
         <MenuSection products={data.products} onSaved={refresh} />
         <LocationsSection locations={data.locations} onSaved={refresh} />
         <WindowsSection windows={data.windows} onSaved={refresh} />
+        <StaffSection />
+
       </main>
     </div>
   );
@@ -788,6 +794,135 @@ function WindowsSection({ windows, onSaved }: { windows: AdminWindow[]; onSaved:
             Cancel
           </button>
         ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function StaffSection() {
+  const queryClient = useQueryClient();
+  const load = useServerFn(listStaff);
+  const invite = useServerFn(inviteStaff);
+  const update = useServerFn(updateStaff);
+
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<StaffRole>("staff");
+
+  const staffQuery = useQuery({ queryKey: ["staff"], queryFn: () => load() });
+  const refreshStaff = () => void queryClient.invalidateQueries({ queryKey: ["staff"] });
+
+  const inviteMutation = useMutation({
+    mutationFn: (payload: { email: string; role: StaffRole }) => invite({ data: payload }),
+    onSuccess: () => {
+      toast.success("Invitation sent. They'll have access as soon as they sign in.");
+      setEmail("");
+      refreshStaff();
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Could not invite that person."),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: { userId: string; role?: StaffRole; active?: boolean }) =>
+      update({ data: payload }),
+    onSuccess: () => {
+      toast.success("Staff access updated.");
+      refreshStaff();
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Could not update staff access."),
+  });
+
+  return (
+    <Card
+      title="Staff management"
+      description="Owners can change everything here. Staff can only view and update orders and payment status."
+    >
+      <form
+        className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!email.trim()) {
+            toast.error("Enter an email address first.");
+            return;
+          }
+          inviteMutation.mutate({ email: email.trim(), role });
+        }}
+      >
+        <label className={label}>
+          Email address
+          <input
+            className={`${input} mt-1`}
+            type="email"
+            value={email}
+            maxLength={160}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="person@example.com"
+          />
+        </label>
+        <label className={label}>
+          Access level
+          <select
+            className={`${input} mt-1 sm:w-40`}
+            value={role}
+            onChange={(event) => setRole(event.target.value as StaffRole)}
+          >
+            <option value="staff">Staff</option>
+            <option value="owner">Owner</option>
+          </select>
+        </label>
+        <button type="submit" className={`${button} sm:mt-6`} disabled={inviteMutation.isPending}>
+          {inviteMutation.isPending ? "Inviting…" : "Invite"}
+        </button>
+      </form>
+
+      <div className="mt-5 space-y-3">
+        {staffQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading staff…</p>
+        ) : (staffQuery.data?.length ?? 0) === 0 ? (
+          <p className="text-sm text-muted-foreground">No staff added yet.</p>
+        ) : (
+          staffQuery.data?.map((member) => (
+            <div
+              key={member.userId}
+              className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  {member.email || "Pending invitation"}
+                  {member.isSelf ? " (you)" : ""}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {member.active ? "Active" : "Access deactivated"}
+                </p>
+              </div>
+              <select
+                aria-label={`Access level for ${member.email}`}
+                className={`${input} sm:w-36`}
+                value={member.role === "admin" ? "owner" : member.role}
+                onChange={(event) =>
+                  updateMutation.mutate({
+                    userId: member.userId,
+                    role: event.target.value as StaffRole,
+                  })
+                }
+              >
+                <option value="staff">Staff</option>
+                <option value="owner">Owner</option>
+              </select>
+              <button
+                type="button"
+                className={ghost}
+                disabled={updateMutation.isPending}
+                onClick={() =>
+                  updateMutation.mutate({ userId: member.userId, active: !member.active })
+                }
+              >
+                {member.active ? "Deactivate" : "Reactivate"}
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </Card>
   );

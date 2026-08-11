@@ -319,8 +319,9 @@ export const getOrderHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data, context }): Promise<AuditEntry[]> => {
-    const { assertAdmin } = await import("@/lib/control-center.server");
-    await assertAdmin(context);
+    const { assertStaff } = await import("@/lib/control-center.server");
+    await assertStaff(context);
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: rows, error } = await supabaseAdmin

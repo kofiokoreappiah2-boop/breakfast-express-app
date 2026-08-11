@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -55,6 +55,10 @@ function CheckoutPage() {
   const [instructions, setInstructions] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
+  // One id per checkout attempt: retries and double clicks reuse the same
+  // order instead of creating a new one.
+  const requestIdRef = useRef<string | null>(null);
+  const inFlightRef = useRef(false);
 
   function validate(): boolean {
     const next: Errors = {};
@@ -71,10 +75,18 @@ function CheckoutPage() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (inFlightRef.current) return;
     if (!validate()) {
       toast.error("Please fix the highlighted fields.");
       return;
     }
+    if (!requestIdRef.current) {
+      requestIdRef.current =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+    inFlightRef.current = true;
     setSubmitting(true);
     try {
       const receipt = await submitOrder({
@@ -85,10 +97,12 @@ function CheckoutPage() {
           deliveryWindow: window_,
           paymentMethod: payment as PaymentMethod,
           additionalInstructions: instructions.trim(),
+          clientRequestId: requestIdRef.current,
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
         },
       });
       sessionStorage.setItem(RECEIPT_STORAGE_KEY, JSON.stringify(receipt));
+      requestIdRef.current = null;
       clearCart();
       navigate({ to: "/order-confirmation" });
     } catch (error) {
@@ -96,9 +110,11 @@ function CheckoutPage() {
         error instanceof Error ? error.message : "We couldn't place your order. Please try again.",
       );
     } finally {
+      inFlightRef.current = false;
       setSubmitting(false);
     }
   }
+
 
   return (
     <div className="min-h-screen">

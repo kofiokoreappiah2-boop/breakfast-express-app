@@ -16,6 +16,8 @@ const orderSchema = z.object({
   deliveryWindow: z.string().trim().min(1).max(120),
   paymentMethod: z.enum(PAYMENT_METHODS),
   additionalInstructions: z.string().trim().max(500).default(""),
+  // Stable per checkout attempt so refreshes and double clicks reuse one order.
+  clientRequestId: z.string().uuid().optional(),
   items: z
     .array(
       z.object({
@@ -32,11 +34,27 @@ export type CreateOrderInput = z.input<typeof orderSchema>;
 const BUSY_MESSAGE =
   "We're unable to process this order right now. Please wait a moment and try again.";
 
+// A single household phone stays tightly limited, while a shared Wi-Fi network
+// (one IP, many students) gets far more headroom so real customers get through.
+const PHONE_LIMIT_10_MIN = 5;
+const PHONE_LIMIT_HOUR = 15;
+const IP_LIMIT_10_MIN = 40;
+const IP_LIMIT_HOUR = 120;
+
+
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => orderSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { getRequestHeader } = await import("@tanstack/react-start/server");
+
+    // --- Same attempt already placed? Return it instead of ordering twice ----
+    if (data.clientRequestId) {
+      const { loadReceiptByRequestId } = await import("@/lib/orders.server");
+      const existing = await loadReceiptByRequestId(supabaseAdmin, data.clientRequestId);
+      if (existing) return existing;
+    }
+
 
     // --- Server-side throttle (never trusts the browser) ---------------------
     const forwarded = getRequestHeader("x-forwarded-for") ?? "";
@@ -46,36 +64,48 @@ export const createOrder = createServerFn({ method: "POST" })
       getRequestHeader("x-real-ip") ||
       "unknown";
     const phoneKey = data.customerPhone.replace(/\D/g, "");
-    const keys = [`ip:${ip}`, `phone:${phoneKey}`];
+    const ipKey = `ip:${ip}`;
+    const phoneKeyed = `phone:${phoneKey}`;
 
     const since10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const since60 = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    const [{ count: recent }, { count: hourly }] = await Promise.all([
-      supabaseAdmin
+    const countFor = async (key: string, since: string) => {
+      const { count } = await supabaseAdmin
         .from("checkout_throttle")
         .select("id", { count: "exact", head: true })
-        .in("client_key", keys)
-        .gte("created_at", since10),
-      supabaseAdmin
-        .from("checkout_throttle")
-        .select("id", { count: "exact", head: true })
-        .in("client_key", keys)
-        .gte("created_at", since60),
+        .eq("client_key", key)
+        .gte("created_at", since);
+      return count ?? 0;
+    };
+
+    // Each key is counted on its own — mixing them made two orders look like
+    // four and blocked genuine customers.
+    const [phone10, phone60, ip10, ip60] = await Promise.all([
+      countFor(phoneKeyed, since10),
+      countFor(phoneKeyed, since60),
+      countFor(ipKey, since10),
+      countFor(ipKey, since60),
     ]);
 
-    if ((recent ?? 0) >= 5 || (hourly ?? 0) >= 15) {
+    if (
+      phone10 >= PHONE_LIMIT_10_MIN ||
+      phone60 >= PHONE_LIMIT_HOUR ||
+      ip10 >= IP_LIMIT_10_MIN ||
+      ip60 >= IP_LIMIT_HOUR
+    ) {
       throw new Error(BUSY_MESSAGE);
     }
 
     await supabaseAdmin
       .from("checkout_throttle")
-      .insert(keys.map((client_key) => ({ client_key })));
+      .insert([{ client_key: ipKey }, { client_key: phoneKeyed }]);
     // Housekeeping: drop records older than a day.
     void supabaseAdmin
       .from("checkout_throttle")
       .delete()
       .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
 
     // --- Business availability ----------------------------------------------
     const { data: settings } = await supabaseAdmin
@@ -174,6 +204,7 @@ export const createOrder = createServerFn({ method: "POST" })
         delivery_window: data.deliveryWindow,
         payment_method: data.paymentMethod,
         additional_instructions: data.additionalInstructions ?? "",
+        client_request_id: data.clientRequestId ?? null,
         subtotal,
         total: subtotal,
       })
@@ -182,7 +213,18 @@ export const createOrder = createServerFn({ method: "POST" })
       )
       .single();
 
-    if (orderError || !order) throw new Error("We couldn't place your order. Please try again.");
+    if (orderError || !order) {
+
+      // Two clicks landed at once: the unique request id kept the second one
+      // out, so hand back the order the first click created.
+      if (data.clientRequestId) {
+        const { loadReceiptByRequestId } = await import("@/lib/orders.server");
+        const existing = await loadReceiptByRequestId(supabaseAdmin, data.clientRequestId);
+        if (existing) return existing;
+      }
+      throw new Error("We couldn't place your order. Please try again.");
+    }
+
 
     const { error: itemsError } = await supabaseAdmin.from("order_items").insert(
       rows.map((r) => ({

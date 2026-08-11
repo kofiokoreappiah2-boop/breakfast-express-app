@@ -2,8 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
- * Bootstrap helper: the first signed-in user may claim the administrator role.
- * Once an administrator exists, this always refuses.
+ * Bootstrap helper: the first signed-in user may claim the owner role.
+ * Once an owner exists, this always refuses.
  */
 export const claimAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -13,15 +13,19 @@ export const claimAdmin = createServerFn({ method: "POST" })
     const { count, error: countError } = await supabaseAdmin
       .from("user_roles")
       .select("id", { count: "exact", head: true })
-      .eq("role", "admin");
+      .in("role", ["owner", "admin"]);
 
-    if (countError) throw new Error("Could not verify administrator access.");
-    if ((count ?? 0) > 0) throw new Error("An administrator already exists for this store.");
+    if (countError) throw new Error("Could not verify owner access.");
+    if ((count ?? 0) > 0) throw new Error("An owner already exists for this store.");
 
-    const { error } = await supabaseAdmin
-      .from("user_roles")
-      .insert({ user_id: context.userId, role: "admin" });
+    const { error } = await supabaseAdmin.from("user_roles").insert({
+      user_id: context.userId,
+      role: "owner",
+      email: (context.claims?.["email"] as string | undefined) ?? null,
+      active: true,
+    });
 
-    if (error) throw new Error("Could not grant administrator access.");
+    if (error) throw new Error("Could not grant owner access.");
     return { ok: true };
   });
+

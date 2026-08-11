@@ -51,20 +51,60 @@ function ConfirmationPage() {
     return lines.join("\n");
   }
 
+  /** Last-resort copy for browsers without the async clipboard API. */
+  function legacyCopy(text: string): boolean {
+    try {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(area);
+      return copied;
+    } catch {
+      return false;
+    }
+  }
+
   async function shareOrder() {
     if (!receipt) return;
     const text = buildPlainText(receipt);
+    const title = `${BUSINESS.name} order #${receipt.orderNumber}`;
+
+    // 1. Native share sheet on mobile.
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title, text });
+        return;
+      } catch (error) {
+        // The customer closed the sheet — don't fall through to copying.
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        // Anything else (blocked in an embedded frame, unsupported payload)
+        // falls through to the clipboard below.
+      }
+    }
+
+    // 2. Clipboard, then a plain textarea copy for older browsers.
     try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: `Order #${receipt.orderNumber}`, text });
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        toast.success("Order details copied to your clipboard.");
         return;
       }
-      await navigator.clipboard.writeText(text);
-      toast.success("Order details copied to your clipboard.");
     } catch {
-      // User cancelled the share sheet — nothing to report.
+      // Ignored — handled by the legacy path below.
     }
+
+    if (legacyCopy(text)) {
+      toast.success("Order details copied to your clipboard.");
+      return;
+    }
+    toast.error("Sharing isn't available here — use Save / Print order instead.");
   }
+
 
   return (
     <div className="min-h-screen">

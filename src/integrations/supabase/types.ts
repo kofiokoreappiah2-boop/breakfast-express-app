@@ -276,6 +276,7 @@ export type Database = {
       orders: {
         Row: {
           additional_instructions: string
+          client_request_id: string | null
           created_at: string
           customer_name: string
           customer_phone: string
@@ -291,6 +292,7 @@ export type Database = {
         }
         Insert: {
           additional_instructions?: string
+          client_request_id?: string | null
           created_at?: string
           customer_name: string
           customer_phone: string
@@ -306,6 +308,7 @@ export type Database = {
         }
         Update: {
           additional_instructions?: string
+          client_request_id?: string | null
           created_at?: string
           customer_name?: string
           customer_phone?: string
@@ -362,21 +365,33 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          active: boolean
           created_at: string
+          email: string | null
           id: string
+          invited_by: string | null
           role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
           user_id: string
         }
         Insert: {
+          active?: boolean
           created_at?: string
+          email?: string | null
           id?: string
+          invited_by?: string | null
           role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
           user_id: string
         }
         Update: {
+          active?: boolean
           created_at?: string
+          email?: string | null
           id?: string
+          invited_by?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -389,7 +404,7 @@ export type Database = {
       next_order_number: { Args: never; Returns: string }
     }
     Enums: {
-      app_role: "admin"
+      app_role: "admin" | "owner" | "staff"
       order_status:
         | "New"
         | "Confirmed"
@@ -525,7 +540,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin"],
+      app_role: ["admin", "owner", "staff"],
       order_status: [
         "New",
         "Confirmed",
