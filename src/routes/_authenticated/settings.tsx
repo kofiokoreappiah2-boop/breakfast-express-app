@@ -70,10 +70,12 @@ function ControlCenterPage() {
   if (query.error || !query.data) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-display text-2xl font-bold">Administrator access required</h1>
+        <h1 className="font-display text-2xl font-bold">Owner access required</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Only staff accounts with administrator access can open the control center.
+          Only owner accounts can open the control center. Staff accounts can manage orders and
+          payment status from the order dashboard.
         </p>
+
         <Link to="/admin" className={`${ghost} mt-6`}>
           Back to orders
         </Link>
