@@ -1,15 +1,36 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** Throws unless the signed-in caller holds the admin role. */
-export async function assertAdmin(context: { supabase: SupabaseClient; userId: string }) {
-  const { data, error } = await context.supabase
+type AuthContext = { supabase: SupabaseClient; userId: string };
+
+async function activeRoles(context: AuthContext): Promise<string[]> {
+  // Read through the caller's own client so row level security applies.
+  const { data } = await context.supabase
     .from("user_roles")
-    .select("role")
+    .select("role, active")
     .eq("user_id", context.userId)
-    .eq("role", "admin")
-    .maybeSingle();
-  if (error || !data) throw new Error("Administrator access required.");
+    .eq("active", true);
+  return (data ?? []).map((row) => row.role as string);
 }
+
+/** Throws unless the signed-in caller is an owner (full business access). */
+export async function assertOwner(context: AuthContext) {
+  const roles = await activeRoles(context);
+  if (!roles.includes("owner") && !roles.includes("admin")) {
+    throw new Error("Owner access required.");
+  }
+}
+
+/** Throws unless the caller is owner or staff (order handling access). */
+export async function assertStaff(context: AuthContext) {
+  const roles = await activeRoles(context);
+  if (!roles.some((role) => role === "owner" || role === "admin" || role === "staff")) {
+    throw new Error("Staff access required.");
+  }
+}
+
+/** Legacy alias kept so existing call sites stay valid. */
+export const assertAdmin = assertOwner;
+
 
 const BUCKET = "product-images";
 
