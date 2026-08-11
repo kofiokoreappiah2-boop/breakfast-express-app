@@ -16,6 +16,8 @@ const orderSchema = z.object({
   deliveryWindow: z.string().trim().min(1).max(120),
   paymentMethod: z.enum(PAYMENT_METHODS),
   additionalInstructions: z.string().trim().max(500).default(""),
+  // Stable per checkout attempt so refreshes and double clicks reuse one order.
+  clientRequestId: z.string().uuid().optional(),
   items: z
     .array(
       z.object({
@@ -31,6 +33,14 @@ export type CreateOrderInput = z.input<typeof orderSchema>;
 
 const BUSY_MESSAGE =
   "We're unable to process this order right now. Please wait a moment and try again.";
+
+// A single household phone stays tightly limited, while a shared Wi-Fi network
+// (one IP, many students) gets far more headroom so real customers get through.
+const PHONE_LIMIT_10_MIN = 5;
+const PHONE_LIMIT_HOUR = 15;
+const IP_LIMIT_10_MIN = 40;
+const IP_LIMIT_HOUR = 120;
+
 
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => orderSchema.parse(data))
