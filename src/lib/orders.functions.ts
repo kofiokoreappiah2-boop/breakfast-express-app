@@ -214,7 +214,6 @@ export const createOrder = createServerFn({ method: "POST" })
       .single();
 
     if (orderError || !order) {
-      console.error("order insert failed", orderError);
 
       // Two clicks landed at once: the unique request id kept the second one
       // out, so hand back the order the first click created.
@@ -223,7 +222,7 @@ export const createOrder = createServerFn({ method: "POST" })
         const existing = await loadReceiptByRequestId(supabaseAdmin, data.clientRequestId);
         if (existing) return existing;
       }
-      throw new Error("DEBUG " + JSON.stringify(orderError));
+      throw new Error("We couldn't place your order. Please try again.");
     }
 
 
