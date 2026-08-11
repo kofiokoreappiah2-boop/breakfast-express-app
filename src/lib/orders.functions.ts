@@ -50,9 +50,11 @@ export const createOrder = createServerFn({ method: "POST" })
 
     // --- Same attempt already placed? Return it instead of ordering twice ----
     if (data.clientRequestId) {
+      const { loadReceiptByRequestId } = await import("@/lib/orders.server");
       const existing = await loadReceiptByRequestId(supabaseAdmin, data.clientRequestId);
       if (existing) return existing;
     }
+
 
     // --- Server-side throttle (never trusts the browser) ---------------------
     const forwarded = getRequestHeader("x-forwarded-for") ?? "";
