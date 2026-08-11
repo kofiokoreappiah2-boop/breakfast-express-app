@@ -69,27 +69,19 @@ function AdminPage() {
   const [todayOnly, setTodayOnly] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  const loadAccess = useServerFn(getMyAccess);
   const rolesQuery = useQuery({
-    queryKey: ["admin-role"],
-    queryFn: async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return false;
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userData.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      if (error) throw error;
-      return !!data;
-    },
+    queryKey: ["my-access"],
+    queryFn: () => loadAccess({}),
   });
 
-  const isAdmin = rolesQuery.data === true;
+  const isStaff = rolesQuery.data?.isStaff === true;
+  const isOwner = rolesQuery.data?.isOwner === true;
 
   const ordersQuery = useQuery({
     queryKey: ["admin-orders"],
-    enabled: isAdmin,
+    enabled: isStaff,
+
     queryFn: async (): Promise<OrderRow[]> => {
       const { data, error } = await supabase
         .from("orders")
