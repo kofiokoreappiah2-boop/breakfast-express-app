@@ -204,6 +204,7 @@ export const createOrder = createServerFn({ method: "POST" })
         delivery_window: data.deliveryWindow,
         payment_method: data.paymentMethod,
         additional_instructions: data.additionalInstructions ?? "",
+        client_request_id: data.clientRequestId ?? null,
         subtotal,
         total: subtotal,
       })
@@ -212,7 +213,17 @@ export const createOrder = createServerFn({ method: "POST" })
       )
       .single();
 
-    if (orderError || !order) throw new Error("We couldn't place your order. Please try again.");
+    if (orderError || !order) {
+      // Two clicks landed at once: the unique request id kept the second one
+      // out, so hand back the order the first click created.
+      if (data.clientRequestId) {
+        const { loadReceiptByRequestId } = await import("@/lib/orders.server");
+        const existing = await loadReceiptByRequestId(supabaseAdmin, data.clientRequestId);
+        if (existing) return existing;
+      }
+      throw new Error("We couldn't place your order. Please try again.");
+    }
+
 
     const { error: itemsError } = await supabaseAdmin.from("order_items").insert(
       rows.map((r) => ({
