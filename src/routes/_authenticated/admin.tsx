@@ -154,31 +154,33 @@ function AdminPage() {
     return <p className="p-8 text-center text-muted-foreground">Checking your access…</p>;
   }
 
-  if (!isAdmin) {
+  if (!isStaff) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-display text-2xl font-bold">Administrator access required</h1>
+        <h1 className="font-display text-2xl font-bold">Staff access required</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your account isn't an administrator yet. If you are the {BUSINESS.name} owner setting up
-          the store for the first time, you can claim the administrator role now.
+          Your account doesn't have access yet. If you are the {BUSINESS.name} owner setting up the
+          store for the first time, you can claim owner access now. Otherwise ask the owner to
+          invite you from the control center.
         </p>
         <button
           type="button"
           onClick={async () => {
             try {
               await claim({});
-              toast.success("You are now the administrator.");
+              toast.success("You are now the owner.");
               void rolesQuery.refetch();
             } catch (error) {
               toast.error(
-                error instanceof Error ? error.message : "Could not grant administrator access.",
+                error instanceof Error ? error.message : "Could not grant owner access.",
               );
             }
           }}
           className="mt-6 h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground"
         >
-          Claim administrator access
+          Claim owner access
         </button>
+
         <button
           type="button"
           onClick={signOut}
