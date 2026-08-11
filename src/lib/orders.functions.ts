@@ -214,6 +214,8 @@ export const createOrder = createServerFn({ method: "POST" })
       .single();
 
     if (orderError || !order) {
+      console.error("order insert failed", orderError);
+
       // Two clicks landed at once: the unique request id kept the second one
       // out, so hand back the order the first click created.
       if (data.clientRequestId) {
