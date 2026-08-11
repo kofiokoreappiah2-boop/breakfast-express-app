@@ -223,7 +223,7 @@ export const createOrder = createServerFn({ method: "POST" })
         const existing = await loadReceiptByRequestId(supabaseAdmin, data.clientRequestId);
         if (existing) return existing;
       }
-      throw new Error("We couldn't place your order. Please try again.");
+      throw new Error("DEBUG " + JSON.stringify(orderError));
     }
 
 
