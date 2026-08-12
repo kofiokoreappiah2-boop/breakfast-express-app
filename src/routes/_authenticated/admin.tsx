@@ -3,7 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogOut, RefreshCw } from "lucide-react";
+import { Download, LogOut, Printer, RefreshCw } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { formatCedis } from "@/lib/format";
@@ -12,6 +12,7 @@ import {
   DELIVERY_LOCATIONS,
   DELIVERY_WINDOWS,
   ORDER_STATUSES,
+  PAYMENT_METHODS,
   PAYMENT_STATUSES,
   type OrderStatus,
   type PaymentStatus,
@@ -19,6 +20,16 @@ import {
 import { claimAdmin } from "@/lib/admin.functions";
 import { getMyAccess } from "@/lib/staff.functions";
 import { getOrderHistory } from "@/lib/control-center.functions";
+import {
+  EMPTY_FILTERS,
+  buildCsv,
+  buildPrintHtml,
+  describeRange,
+  filterOrders,
+  summarise,
+  type OrderFilters,
+  type ReportOrder,
+} from "@/lib/order-report";
 
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -127,8 +138,11 @@ function AdminPage() {
 
   const orders = ordersQuery.data ?? [];
 
-  const filtered = useMemo(() => filterOrders(orders as ReportOrder[], filters), [orders, filters]);
-  const summary = useMemo(() => summarise(filtered), [filtered]);
+  const filtered = useMemo(
+    () => filterOrders(orders as unknown as ReportOrder[], filters) as unknown as OrderRow[],
+    [orders, filters],
+  );
+  const summary = useMemo(() => summarise(filtered as unknown as ReportOrder[]), [filtered]);
   const totalSales = summary.totalSales;
 
   const locationOptions = useMemo(
@@ -145,7 +159,7 @@ function AdminPage() {
       toast.error("No orders match these filters.");
       return;
     }
-    const html = buildPrintHtml(filtered, BUSINESS.name, describeRange(filters));
+    const html = buildPrintHtml(filtered as unknown as ReportOrder[], BUSINESS.name, describeRange(filters));
     const win = window.open("", "_blank", "noopener,noreferrer,width=1000,height=800");
     if (!win) {
       toast.error("Please allow pop-ups to print the delivery sheet.");
@@ -161,7 +175,7 @@ function AdminPage() {
       toast.error("No orders match these filters.");
       return;
     }
-    const csv = buildCsv(filtered);
+    const csv = buildCsv(filtered as unknown as ReportOrder[]);
     const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
