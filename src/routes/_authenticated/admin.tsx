@@ -244,62 +244,194 @@ function AdminPage() {
           />
         </div>
 
-        <div className="surface-card mt-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="block text-sm font-semibold">
-            Status
-            <select
-              className={`${selectClass} mt-1`}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All statuses</option>
-              {ORDER_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">
-            Delivery location
-            <select
-              className={`${selectClass} mt-1`}
-              value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-            >
-              <option value="all">All locations</option>
-              {DELIVERY_LOCATIONS.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">
-            Delivery window
-            <select
-              className={`${selectClass} mt-1`}
-              value={windowFilter}
-              onChange={(e) => setWindowFilter(e.target.value)}
-            >
-              <option value="all">All windows</option>
-              {DELIVERY_WINDOWS.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-end gap-2 text-sm font-semibold">
-            <input
-              type="checkbox"
-              className="h-5 w-5 accent-[var(--color-primary)]"
-              checked={todayOnly}
-              onChange={(e) => setTodayOnly(e.target.checked)}
-            />
-            Today's orders only
-          </label>
+        <div className="surface-card mt-4 space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-display text-lg font-bold">Filter &amp; report</h2>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setFilters(EMPTY_FILTERS)}
+                className="h-10 rounded-xl border border-border px-3 text-sm font-medium"
+              >
+                Clear filters
+              </button>
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-sm font-medium"
+              >
+                <Printer className="h-4 w-4" aria-hidden="true" /> Print orders
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="block text-sm font-semibold">
+              Date range
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.preset}
+                onChange={(e) => setFilter("preset", e.target.value as OrderFilters["preset"])}
+              >
+                <option value="all">All time</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="this-week">This week</option>
+                <option value="last-week">Last week</option>
+                <option value="this-month">This month</option>
+                <option value="custom">Custom range</option>
+              </select>
+            </label>
+
+            {filters.preset === "custom" ? (
+              <>
+                <label className="block text-sm font-semibold">
+                  From
+                  <input
+                    type="date"
+                    className={`${selectClass} mt-1`}
+                    value={filters.from}
+                    onChange={(e) => setFilter("from", e.target.value)}
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  To
+                  <input
+                    type="date"
+                    className={`${selectClass} mt-1`}
+                    value={filters.to}
+                    onChange={(e) => setFilter("to", e.target.value)}
+                  />
+                </label>
+              </>
+            ) : null}
+
+            <label className="block text-sm font-semibold">
+              Delivery location
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.location}
+                onChange={(e) => setFilter("location", e.target.value)}
+              >
+                <option value="all">All locations</option>
+                {locationOptions.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Delivery window
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.window}
+                onChange={(e) => setFilter("window", e.target.value)}
+              >
+                <option value="all">All windows</option>
+                {windowOptions.map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Order status
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.status}
+                onChange={(e) => setFilter("status", e.target.value)}
+              >
+                <option value="all">All statuses</option>
+                {ORDER_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Payment status
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.paymentStatus}
+                onChange={(e) => setFilter("paymentStatus", e.target.value)}
+              >
+                <option value="all">All payment statuses</option>
+                {PAYMENT_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Payment method
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.paymentMethod}
+                onChange={(e) => setFilter("paymentMethod", e.target.value)}
+              >
+                <option value="all">All payment methods</option>
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Customer name
+              <input
+                className={`${selectClass} mt-1`}
+                value={filters.customerName}
+                onChange={(e) => setFilter("customerName", e.target.value)}
+                placeholder="Search name"
+              />
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Phone number
+              <input
+                className={`${selectClass} mt-1`}
+                value={filters.customerPhone}
+                onChange={(e) => setFilter("customerPhone", e.target.value)}
+                placeholder="Search phone"
+                inputMode="tel"
+              />
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Order number
+              <input
+                className={`${selectClass} mt-1`}
+                value={filters.orderNumber}
+                onChange={(e) => setFilter("orderNumber", e.target.value)}
+                placeholder="e.g. EN-1012"
+              />
+            </label>
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            {summary.count} order(s) · sales {formatCedis(summary.totalSales)} · paid{" "}
+            {summary.paidCount} ({formatCedis(summary.paidTotal)}) · pending{" "}
+            {summary.pendingCount} ({formatCedis(summary.pendingTotal)})
+          </p>
         </div>
+
 
         {ordersQuery.isLoading ? (
           <p className="mt-8 text-center text-muted-foreground">Loading orders…</p>
