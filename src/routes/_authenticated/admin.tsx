@@ -3,15 +3,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { LogOut, RefreshCw } from "lucide-react";
+import { Download, LogOut, Printer, RefreshCw } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { formatCedis } from "@/lib/format";
 import {
   BUSINESS,
-  DELIVERY_LOCATIONS,
-  DELIVERY_WINDOWS,
   ORDER_STATUSES,
+  PAYMENT_METHODS,
   PAYMENT_STATUSES,
   type OrderStatus,
   type PaymentStatus,
@@ -19,6 +18,16 @@ import {
 import { claimAdmin } from "@/lib/admin.functions";
 import { getMyAccess } from "@/lib/staff.functions";
 import { getOrderHistory } from "@/lib/control-center.functions";
+import {
+  EMPTY_FILTERS,
+  buildCsv,
+  buildPrintHtml,
+  describeRange,
+  filterOrders,
+  summarise,
+  type OrderFilters,
+  type ReportOrder,
+} from "@/lib/order-report";
 
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -65,10 +74,10 @@ function AdminPage() {
   const queryClient = useQueryClient();
   const claim = useServerFn(claimAdmin);
 
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [locationFilter, setLocationFilter] = useState("all");
-  const [windowFilter, setWindowFilter] = useState("all");
-  const [todayOnly, setTodayOnly] = useState(false);
+  const [filters, setFilters] = useState<OrderFilters>(EMPTY_FILTERS);
+  const setFilter = <K extends keyof OrderFilters>(key: K, value: OrderFilters[K]) =>
+    setFilters((prev) => ({ ...prev, [key]: value }));
+
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const loadAccess = useServerFn(getMyAccess);
@@ -127,21 +136,53 @@ function AdminPage() {
 
   const orders = ordersQuery.data ?? [];
 
-  const filtered = useMemo(() => {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    return orders.filter((order) => {
-      if (statusFilter !== "all" && order.status !== statusFilter) return false;
-      if (locationFilter !== "all" && order.delivery_location !== locationFilter) return false;
-      if (windowFilter !== "all" && order.delivery_window !== windowFilter) return false;
-      if (todayOnly && new Date(order.created_at) < startOfToday) return false;
-      return true;
-    });
-  }, [orders, statusFilter, locationFilter, windowFilter, todayOnly]);
+  const filtered = useMemo(
+    () => filterOrders(orders as unknown as ReportOrder[], filters) as unknown as OrderRow[],
+    [orders, filters],
+  );
+  const summary = useMemo(() => summarise(filtered as unknown as ReportOrder[]), [filtered]);
+  const totalSales = summary.totalSales;
 
-  const totalSales = filtered
-    .filter((o) => o.status !== "Cancelled")
-    .reduce((sum, o) => sum + Number(o.total), 0);
+  const locationOptions = useMemo(
+    () => [...new Set(orders.map((o) => o.delivery_location))].sort(),
+    [orders],
+  );
+  const windowOptions = useMemo(
+    () => [...new Set(orders.map((o) => o.delivery_window))].sort(),
+    [orders],
+  );
+
+  function handlePrint() {
+    if (filtered.length === 0) {
+      toast.error("No orders match these filters.");
+      return;
+    }
+    const html = buildPrintHtml(filtered as unknown as ReportOrder[], BUSINESS.name, describeRange(filters));
+    const win = window.open("", "_blank", "noopener,noreferrer,width=1000,height=800");
+    if (!win) {
+      toast.error("Please allow pop-ups to print the delivery sheet.");
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  }
+
+  function handleExport() {
+    if (filtered.length === 0) {
+      toast.error("No orders match these filters.");
+      return;
+    }
+    const csv = buildCsv(filtered as unknown as ReportOrder[]);
+    const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `einyornose-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -244,62 +285,194 @@ function AdminPage() {
           />
         </div>
 
-        <div className="surface-card mt-4 grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="block text-sm font-semibold">
-            Status
-            <select
-              className={`${selectClass} mt-1`}
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">All statuses</option>
-              {ORDER_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">
-            Delivery location
-            <select
-              className={`${selectClass} mt-1`}
-              value={locationFilter}
-              onChange={(e) => setLocationFilter(e.target.value)}
-            >
-              <option value="all">All locations</option>
-              {DELIVERY_LOCATIONS.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm font-semibold">
-            Delivery window
-            <select
-              className={`${selectClass} mt-1`}
-              value={windowFilter}
-              onChange={(e) => setWindowFilter(e.target.value)}
-            >
-              <option value="all">All windows</option>
-              {DELIVERY_WINDOWS.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-end gap-2 text-sm font-semibold">
-            <input
-              type="checkbox"
-              className="h-5 w-5 accent-[var(--color-primary)]"
-              checked={todayOnly}
-              onChange={(e) => setTodayOnly(e.target.checked)}
-            />
-            Today's orders only
-          </label>
+        <div className="surface-card mt-4 space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-display text-lg font-bold">Filter &amp; report</h2>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setFilters(EMPTY_FILTERS)}
+                className="h-10 rounded-xl border border-border px-3 text-sm font-medium"
+              >
+                Clear filters
+              </button>
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-border px-3 text-sm font-medium"
+              >
+                <Printer className="h-4 w-4" aria-hidden="true" /> Print orders
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-3 text-sm font-semibold text-primary-foreground"
+              >
+                <Download className="h-4 w-4" aria-hidden="true" /> Export CSV
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="block text-sm font-semibold">
+              Date range
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.preset}
+                onChange={(e) => setFilter("preset", e.target.value as OrderFilters["preset"])}
+              >
+                <option value="all">All time</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="this-week">This week</option>
+                <option value="last-week">Last week</option>
+                <option value="this-month">This month</option>
+                <option value="custom">Custom range</option>
+              </select>
+            </label>
+
+            {filters.preset === "custom" ? (
+              <>
+                <label className="block text-sm font-semibold">
+                  From
+                  <input
+                    type="date"
+                    className={`${selectClass} mt-1`}
+                    value={filters.from}
+                    onChange={(e) => setFilter("from", e.target.value)}
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  To
+                  <input
+                    type="date"
+                    className={`${selectClass} mt-1`}
+                    value={filters.to}
+                    onChange={(e) => setFilter("to", e.target.value)}
+                  />
+                </label>
+              </>
+            ) : null}
+
+            <label className="block text-sm font-semibold">
+              Delivery location
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.location}
+                onChange={(e) => setFilter("location", e.target.value)}
+              >
+                <option value="all">All locations</option>
+                {locationOptions.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Delivery window
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.window}
+                onChange={(e) => setFilter("window", e.target.value)}
+              >
+                <option value="all">All windows</option>
+                {windowOptions.map((w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Order status
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.status}
+                onChange={(e) => setFilter("status", e.target.value)}
+              >
+                <option value="all">All statuses</option>
+                {ORDER_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Payment status
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.paymentStatus}
+                onChange={(e) => setFilter("paymentStatus", e.target.value)}
+              >
+                <option value="all">All payment statuses</option>
+                {PAYMENT_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Payment method
+              <select
+                className={`${selectClass} mt-1`}
+                value={filters.paymentMethod}
+                onChange={(e) => setFilter("paymentMethod", e.target.value)}
+              >
+                <option value="all">All payment methods</option>
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Customer name
+              <input
+                className={`${selectClass} mt-1`}
+                value={filters.customerName}
+                onChange={(e) => setFilter("customerName", e.target.value)}
+                placeholder="Search name"
+              />
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Phone number
+              <input
+                className={`${selectClass} mt-1`}
+                value={filters.customerPhone}
+                onChange={(e) => setFilter("customerPhone", e.target.value)}
+                placeholder="Search phone"
+                inputMode="tel"
+              />
+            </label>
+
+            <label className="block text-sm font-semibold">
+              Order number
+              <input
+                className={`${selectClass} mt-1`}
+                value={filters.orderNumber}
+                onChange={(e) => setFilter("orderNumber", e.target.value)}
+                placeholder="e.g. EN-1012"
+              />
+            </label>
+          </div>
+
+          <p className="text-sm text-muted-foreground">
+            {summary.count} order(s) · sales {formatCedis(summary.totalSales)} · paid{" "}
+            {summary.paidCount} ({formatCedis(summary.paidTotal)}) · pending{" "}
+            {summary.pendingCount} ({formatCedis(summary.pendingTotal)})
+          </p>
         </div>
+
 
         {ordersQuery.isLoading ? (
           <p className="mt-8 text-center text-muted-foreground">Loading orders…</p>

@@ -174,6 +174,7 @@ export const createOrder = createServerFn({ method: "POST" })
       .select("id, name, size, price, available")
       .in("id", ids);
 
+    if (productError) console.error("[checkout] product load failed", JSON.stringify(productError));
     if (productError) throw new Error("Could not load the menu. Please try again.");
 
     const rows = data.items.map((item) => {
@@ -214,6 +215,7 @@ export const createOrder = createServerFn({ method: "POST" })
       .single();
 
     if (orderError || !order) {
+      console.error("[checkout] order insert failed", JSON.stringify(orderError));
 
       // Two clicks landed at once: the unique request id kept the second one
       // out, so hand back the order the first click created.
@@ -238,6 +240,7 @@ export const createOrder = createServerFn({ method: "POST" })
     );
 
     if (itemsError) {
+      console.error("[checkout] items insert failed", JSON.stringify(itemsError));
       await supabaseAdmin.from("orders").delete().eq("id", order.id);
       throw new Error("We couldn't save your order items. Please try again.");
     }
