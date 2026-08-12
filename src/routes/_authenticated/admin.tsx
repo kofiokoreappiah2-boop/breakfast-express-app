@@ -65,10 +65,10 @@ function AdminPage() {
   const queryClient = useQueryClient();
   const claim = useServerFn(claimAdmin);
 
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [locationFilter, setLocationFilter] = useState("all");
-  const [windowFilter, setWindowFilter] = useState("all");
-  const [todayOnly, setTodayOnly] = useState(false);
+  const [filters, setFilters] = useState<OrderFilters>(EMPTY_FILTERS);
+  const setFilter = <K extends keyof OrderFilters>(key: K, value: OrderFilters[K]) =>
+    setFilters((prev) => ({ ...prev, [key]: value }));
+
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const loadAccess = useServerFn(getMyAccess);
