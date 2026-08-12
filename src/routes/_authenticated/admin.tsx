@@ -127,21 +127,50 @@ function AdminPage() {
 
   const orders = ordersQuery.data ?? [];
 
-  const filtered = useMemo(() => {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    return orders.filter((order) => {
-      if (statusFilter !== "all" && order.status !== statusFilter) return false;
-      if (locationFilter !== "all" && order.delivery_location !== locationFilter) return false;
-      if (windowFilter !== "all" && order.delivery_window !== windowFilter) return false;
-      if (todayOnly && new Date(order.created_at) < startOfToday) return false;
-      return true;
-    });
-  }, [orders, statusFilter, locationFilter, windowFilter, todayOnly]);
+  const filtered = useMemo(() => filterOrders(orders as ReportOrder[], filters), [orders, filters]);
+  const summary = useMemo(() => summarise(filtered), [filtered]);
+  const totalSales = summary.totalSales;
 
-  const totalSales = filtered
-    .filter((o) => o.status !== "Cancelled")
-    .reduce((sum, o) => sum + Number(o.total), 0);
+  const locationOptions = useMemo(
+    () => [...new Set(orders.map((o) => o.delivery_location))].sort(),
+    [orders],
+  );
+  const windowOptions = useMemo(
+    () => [...new Set(orders.map((o) => o.delivery_window))].sort(),
+    [orders],
+  );
+
+  function handlePrint() {
+    if (filtered.length === 0) {
+      toast.error("No orders match these filters.");
+      return;
+    }
+    const html = buildPrintHtml(filtered, BUSINESS.name, describeRange(filters));
+    const win = window.open("", "_blank", "noopener,noreferrer,width=1000,height=800");
+    if (!win) {
+      toast.error("Please allow pop-ups to print the delivery sheet.");
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  }
+
+  function handleExport() {
+    if (filtered.length === 0) {
+      toast.error("No orders match these filters.");
+      return;
+    }
+    const csv = buildCsv(filtered);
+    const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `einyornose-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
 
   async function signOut() {
     await queryClient.cancelQueries();
