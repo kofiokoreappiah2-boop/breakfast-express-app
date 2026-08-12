@@ -9,8 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCedis } from "@/lib/format";
 import {
   BUSINESS,
-  DELIVERY_LOCATIONS,
-  DELIVERY_WINDOWS,
   ORDER_STATUSES,
   PAYMENT_METHODS,
   PAYMENT_STATUSES,

@@ -316,3 +316,21 @@ ${body || "<p>No orders match the current filters.</p>"}
 <script>window.onload = function () { window.focus(); window.print(); };</script>
 </body></html>`;
 }
+
+/** Human-readable label for the active date range, used on the print sheet. */
+export function describeRange(filters: OrderFilters, now = new Date()): string {
+  const labels: Record<DatePreset, string> = {
+    all: "All orders",
+    today: "Today",
+    yesterday: "Yesterday",
+    "this-week": "This week",
+    "last-week": "Last week",
+    "this-month": "This month",
+    custom: "Custom range",
+  };
+  const [start, end] = resolveRange(filters, now);
+  if (!start && !end) return labels[filters.preset];
+  const fmt = (d: Date) => d.toLocaleDateString("en-GB");
+  const last = end ? new Date(end.getTime() - 1) : null;
+  return `${labels[filters.preset]}: ${start ? fmt(start) : "start"} – ${last ? fmt(last) : "now"}`;
+}
