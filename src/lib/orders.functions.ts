@@ -3,6 +3,7 @@ import { z } from "zod";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { buildOrderNotification } from "@/lib/notification";
 import { money } from "@/lib/format";
+import { getGhanaClock, isBeforeDeliveryCutoff } from "@/lib/delivery-time";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(2, "Name is too short").max(100),
@@ -41,7 +42,6 @@ const PHONE_LIMIT_HOUR = 15;
 const IP_LIMIT_10_MIN = 40;
 const IP_LIMIT_HOUR = 120;
 
-
 export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => orderSchema.parse(data))
   .handler(async ({ data }) => {
@@ -54,7 +54,6 @@ export const createOrder = createServerFn({ method: "POST" })
       const existing = await loadReceiptByRequestId(supabaseAdmin, data.clientRequestId);
       if (existing) return existing;
     }
-
 
     // --- Server-side throttle (never trusts the browser) ---------------------
     const forwarded = getRequestHeader("x-forwarded-for") ?? "";
@@ -106,7 +105,6 @@ export const createOrder = createServerFn({ method: "POST" })
       .delete()
       .lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-
     // --- Business availability ----------------------------------------------
     const { data: settings } = await supabaseAdmin
       .from("business_settings")
@@ -118,8 +116,7 @@ export const createOrder = createServerFn({ method: "POST" })
 
     if (settings && !settings.accepting_orders) {
       throw new Error(
-        settings.closed_message ||
-          "We're currently not accepting orders. Please check back later.",
+        settings.closed_message || "We're currently not accepting orders. Please check back later.",
       );
     }
 
@@ -133,7 +130,7 @@ export const createOrder = createServerFn({ method: "POST" })
     }
 
     // --- Delivery location / window must currently be active -----------------
-    const today = new Date().toISOString().slice(0, 10);
+    const { date: today, time: currentTime } = getGhanaClock();
     const [locationRes, windowRes] = await Promise.all([
       supabaseAdmin
         .from("delivery_locations")
@@ -143,7 +140,7 @@ export const createOrder = createServerFn({ method: "POST" })
         .maybeSingle(),
       supabaseAdmin
         .from("delivery_windows")
-        .select("id")
+        .select("id, start_time")
         .eq("label", data.deliveryWindow)
         .eq("active", true)
         .maybeSingle(),
@@ -154,6 +151,11 @@ export const createOrder = createServerFn({ method: "POST" })
     }
     if (!windowRes.data) {
       throw new Error("That delivery period isn't available. Please choose another one.");
+    }
+    if (!isBeforeDeliveryCutoff(windowRes.data.start_time, currentTime)) {
+      throw new Error(
+        "That delivery period's ordering cutoff has passed. Please choose another one.",
+      );
     }
 
     const { data: exception } = await supabaseAdmin
@@ -203,6 +205,7 @@ export const createOrder = createServerFn({ method: "POST" })
         customer_phone: data.customerPhone,
         delivery_location: data.deliveryLocation,
         delivery_window: data.deliveryWindow,
+        delivery_date: today,
         payment_method: data.paymentMethod,
         additional_instructions: data.additionalInstructions ?? "",
         client_request_id: data.clientRequestId ?? null,
@@ -226,7 +229,6 @@ export const createOrder = createServerFn({ method: "POST" })
       }
       throw new Error("We couldn't place your order. Please try again.");
     }
-
 
     const { error: itemsError } = await supabaseAdmin.from("order_items").insert(
       rows.map((r) => ({

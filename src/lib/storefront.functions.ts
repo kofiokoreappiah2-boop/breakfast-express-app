@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getGhanaClock, isBeforeDeliveryCutoff } from "@/lib/delivery-time";
 
 export type StorefrontSettings = {
   acceptingOrders: boolean;
@@ -41,7 +42,7 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { signImagePaths } = await import("@/lib/images.server");
 
-    const today = new Date().toISOString().slice(0, 10);
+    const { date: today, time: currentTime } = getGhanaClock();
 
     const [settingsRes, productsRes, locationsRes, windowsRes, exceptionsRes] = await Promise.all([
       supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
@@ -56,7 +57,7 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
         .order("sort_order", { ascending: true }),
       supabaseAdmin
         .from("delivery_windows")
-        .select("id, label, active, sort_order")
+        .select("id, label, start_time, active, sort_order")
         .eq("active", true)
         .order("sort_order", { ascending: true }),
       supabaseAdmin
@@ -106,7 +107,9 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
           imageUrl: p.image_path ? (signed[p.image_path] ?? null) : null,
         })),
       locations: (locationsRes.data ?? []).map((l) => l.name),
-      windows: (windowsRes.data ?? []).filter((w) => !blocked.has(w.id)).map((w) => w.label),
+      windows: (windowsRes.data ?? [])
+        .filter((w) => !blocked.has(w.id) && isBeforeDeliveryCutoff(w.start_time, currentTime))
+        .map((w) => w.label),
     };
   },
 );
