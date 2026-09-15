@@ -280,6 +280,7 @@ export type Database = {
           created_at: string
           customer_name: string
           customer_phone: string
+          delivery_date: string
           delivery_location: string
           delivery_window: string
           id: string
@@ -296,6 +297,7 @@ export type Database = {
           created_at?: string
           customer_name: string
           customer_phone: string
+          delivery_date: string
           delivery_location: string
           delivery_window: string
           id?: string
@@ -312,6 +314,7 @@ export type Database = {
           created_at?: string
           customer_name?: string
           customer_phone?: string
+          delivery_date?: string
           delivery_location?: string
           delivery_window?: string
           id?: string
