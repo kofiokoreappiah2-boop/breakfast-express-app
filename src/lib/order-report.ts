@@ -14,6 +14,9 @@ export type ReportOrder = {
   payment_method: string;
   payment_status: string;
   additional_instructions: string;
+  subtotal: number;
+  discount_amount: number;
+  promotion_code: string | null;
   total: number;
   status: string;
   created_at: string;
@@ -188,6 +191,9 @@ export function buildCsv(orders: ReportOrder[]): string {
     "Customer name",
     "Phone",
     "Items",
+    "Subtotal (GHS)",
+    "Discount (GHS)",
+    "Promotion",
     "Total (GHS)",
     "Delivery location",
     "Delivery window",
@@ -205,6 +211,9 @@ export function buildCsv(orders: ReportOrder[]): string {
       order.customer_name,
       order.customer_phone,
       itemsLabel(order),
+      Number(order.subtotal).toFixed(2),
+      Number(order.discount_amount).toFixed(2),
+      order.promotion_code ?? "",
       Number(order.total).toFixed(2),
       order.delivery_location,
       order.delivery_window,
@@ -282,7 +291,11 @@ export function buildPrintHtml(
                         ? `<div class="muted">Note: ${escapeHtml(order.additional_instructions)}</div>`
                         : ""
                     }</td>
-                    <td>${escapeHtml(formatCedis(Number(order.total)))}</td>
+                    <td>${
+                      Number(order.discount_amount) > 0
+                        ? `<span class="muted">${escapeHtml(formatCedis(Number(order.subtotal)))} − ${escapeHtml(formatCedis(Number(order.discount_amount)))}</span><br>`
+                        : ""
+                    }${escapeHtml(formatCedis(Number(order.total)))}</td>
                     <td>${escapeHtml(order.payment_method)}</td>
                     <td>${escapeHtml(order.payment_status)}</td>
                     <td>${escapeHtml(order.status)}</td>

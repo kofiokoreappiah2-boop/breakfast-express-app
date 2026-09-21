@@ -43,6 +43,7 @@ function HomePage() {
   const settings = data?.settings;
   const products = data?.products ?? [];
   const gallery = data?.gallery ?? [];
+  const promotion = data?.promotion ?? null;
   const locations = data?.locations ?? [];
   const windows = data?.windows ?? [];
   const businessName = settings?.businessName ?? BUSINESS.name;
@@ -101,6 +102,44 @@ function HomePage() {
             </a>
           </div>
         </section>
+
+        {promotion ? (
+          <section className="mx-auto max-w-5xl px-4 py-4" aria-label="Founder's Day offer">
+            {promotion.available ? (
+              <a
+                href="#menu"
+                className="surface-card group relative block scroll-mt-20 overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring"
+                aria-label={`Founder's Day offer: ${promotion.remaining} of ${promotion.redemptionLimit} discounts remaining. Go to the menu.`}
+              >
+                <img
+                  src="/founders-day-promo.webp"
+                  alt="Be one of the first 10 app customers and get GH₵5 off your Einyornose breakfast"
+                  width={1600}
+                  height={800}
+                  className="h-auto w-full transition-transform duration-300 group-hover:scale-[1.01]"
+                />
+                <span className="absolute bottom-3 right-3 rounded-full bg-card/95 px-3 py-1.5 text-xs font-bold text-foreground shadow-lift sm:bottom-5 sm:right-5 sm:text-sm">
+                  {promotion.remaining} offer{promotion.remaining === 1 ? "" : "s"} remaining
+                </span>
+              </a>
+            ) : (
+              <div className="surface-card relative overflow-hidden">
+                <img
+                  src="/founders-day-promo.webp"
+                  alt="Founder's Day Einyornose promotion"
+                  width={1600}
+                  height={800}
+                  className="h-auto w-full opacity-35 grayscale"
+                />
+                <div className="absolute inset-0 grid place-items-center bg-background/55 px-5 text-center">
+                  <p className="rounded-xl bg-card px-5 py-3 font-display text-xl font-bold shadow-lift sm:text-3xl">
+                    Founder&apos;s Day offer fully claimed
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+        ) : null}
 
         <section id="menu" className="mx-auto max-w-5xl scroll-mt-20 px-4 py-6">
           <h2 className="font-display text-2xl font-bold sm:text-3xl">This morning's menu</h2>

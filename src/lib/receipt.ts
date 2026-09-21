@@ -12,6 +12,8 @@ export type StoredReceipt = {
   momoAccountName?: string;
   additionalInstructions: string;
   subtotal: number;
+  discountAmount?: number;
+  promotionCode?: string | null;
   total: number;
   items: {
     name: string;

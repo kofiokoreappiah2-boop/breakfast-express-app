@@ -13,7 +13,7 @@ export async function loadReceiptByRequestId(
   const { data: order } = await supabaseAdmin
     .from("orders")
     .select(
-      "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, payment_status, additional_instructions, subtotal, total",
+      "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, payment_status, additional_instructions, subtotal, discount_amount, promotion_code, total",
     )
     .eq("client_request_id", clientRequestId)
     .maybeSingle();
@@ -36,6 +36,8 @@ export async function loadReceiptByRequestId(
     paymentStatus: order.payment_status,
     additionalInstructions: order.additional_instructions ?? "",
     subtotal: Number(order.subtotal),
+    discountAmount: Number(order.discount_amount),
+    promotionCode: order.promotion_code,
     total: Number(order.total),
     items: (items ?? []).map((item) => ({
       name: item.product_name as string,

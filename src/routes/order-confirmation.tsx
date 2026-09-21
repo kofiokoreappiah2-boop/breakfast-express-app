@@ -46,6 +46,10 @@ function ConfirmationPage() {
         (i) =>
           `  - ${i.name}${i.size ? ` (${i.size})` : ""} x${i.quantity} = ${formatCedis(i.subtotal)}`,
       ),
+      `Subtotal: ${formatCedis(r.subtotal)}`,
+      ...(r.discountAmount && r.discountAmount > 0
+        ? [`Founder's Day discount: -${formatCedis(r.discountAmount)}`]
+        : []),
       `Total: ${formatCedis(r.total)}`,
     ];
     return lines.join("\n");
@@ -163,6 +167,16 @@ function ConfirmationPage() {
                 </ul>
               </div>
 
+              <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="font-semibold">{formatCedis(receipt.subtotal)}</span>
+              </div>
+              {(receipt.discountAmount ?? 0) > 0 ? (
+                <div className="flex items-center justify-between text-sm font-semibold text-primary">
+                  <span>Founder&apos;s Day discount</span>
+                  <span>−{formatCedis(receipt.discountAmount ?? 0)}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between border-t border-border pt-3">
                 <span className="font-semibold">Total amount</span>
                 <span className="font-display text-2xl font-bold text-primary">

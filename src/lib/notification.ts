@@ -8,6 +8,8 @@ export type NotificationOrder = {
   deliveryWindow: string;
   paymentMethod: string;
   additionalInstructions: string;
+  subtotal: number;
+  discountAmount?: number;
   total: number;
   items: { name: string; size: string | null; quantity: number; subtotal: number }[];
 };
@@ -38,6 +40,10 @@ export function buildOrderNotification(order: NotificationOrder): string {
     "ORDER:",
     lines,
     "",
+    `SUBTOTAL: ${formatCedis(order.subtotal)}`,
+    ...(order.discountAmount && order.discountAmount > 0
+      ? [`FOUNDER'S DAY DISCOUNT: -${formatCedis(order.discountAmount)}`]
+      : []),
     `TOTAL: ${formatCedis(order.total)}`,
     "",
     `Payment: ${order.paymentMethod}`,

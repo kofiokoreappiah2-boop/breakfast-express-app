@@ -21,8 +21,14 @@ export const Route = createFileRoute("/cart")({
 });
 
 function CartPage() {
-  const { items, subtotal, total, setQuantity, removeItem } = useCart();
+  const { items, subtotal, setQuantity, removeItem } = useCart();
   const { data: storefront } = useStorefront();
+  const promotion = storefront?.promotion;
+  const estimatedDiscount =
+    promotion?.available && promotion.remaining > 0
+      ? Math.min(promotion.discountAmount, subtotal)
+      : 0;
+  const estimatedTotal = subtotal - estimatedDiscount;
 
   return (
     <div className="min-h-screen">
@@ -108,12 +114,24 @@ function CartPage() {
                 <span>Subtotal</span>
                 <span className="font-semibold text-foreground">{formatCedis(subtotal)}</span>
               </div>
+              {estimatedDiscount > 0 ? (
+                <div className="flex items-center justify-between text-sm font-semibold text-primary">
+                  <span>Founder&apos;s Day discount</span>
+                  <span>−{formatCedis(estimatedDiscount)}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between border-t border-border pt-3">
                 <span className="font-semibold">Total</span>
                 <span className="font-display text-2xl font-bold text-primary">
-                  {formatCedis(total)}
+                  {formatCedis(estimatedTotal)}
                 </span>
               </div>
+              {estimatedDiscount > 0 && promotion ? (
+                <p className="text-xs text-muted-foreground">
+                  {promotion.remaining} offer{promotion.remaining === 1 ? "" : "s"} remaining. Your
+                  discount is secured when your order is successfully placed.
+                </p>
+              ) : null}
               <Link
                 to="/checkout"
                 className="mt-3 flex h-12 w-full items-center justify-center rounded-xl bg-primary text-base font-semibold text-primary-foreground"

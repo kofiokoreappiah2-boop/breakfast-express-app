@@ -319,10 +319,12 @@ export type Database = {
           delivery_date: string;
           delivery_location: string;
           delivery_window: string;
+          discount_amount: number;
           id: string;
           order_number: string;
           payment_method: string;
           payment_status: Database["public"]["Enums"]["payment_status"];
+          promotion_code: string | null;
           status: Database["public"]["Enums"]["order_status"];
           subtotal: number;
           total: number;
@@ -336,10 +338,12 @@ export type Database = {
           delivery_date: string;
           delivery_location: string;
           delivery_window: string;
+          discount_amount?: number;
           id?: string;
           order_number?: string;
           payment_method: string;
           payment_status?: Database["public"]["Enums"]["payment_status"];
+          promotion_code?: string | null;
           status?: Database["public"]["Enums"]["order_status"];
           subtotal?: number;
           total?: number;
@@ -353,15 +357,25 @@ export type Database = {
           delivery_date?: string;
           delivery_location?: string;
           delivery_window?: string;
+          discount_amount?: number;
           id?: string;
           order_number?: string;
           payment_method?: string;
           payment_status?: Database["public"]["Enums"]["payment_status"];
+          promotion_code?: string | null;
           status?: Database["public"]["Enums"]["order_status"];
           subtotal?: number;
           total?: number;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "orders_promotion_code_fkey";
+            columns: ["promotion_code"];
+            isOneToOne: false;
+            referencedRelation: "promotions";
+            referencedColumns: ["code"];
+          },
+        ];
       };
       products: {
         Row: {
@@ -398,6 +412,45 @@ export type Database = {
           price?: number;
           size?: string | null;
           sort_order?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      promotions: {
+        Row: {
+          active: boolean;
+          code: string;
+          created_at: string;
+          discount_amount: number;
+          ends_at: string | null;
+          redemption_limit: number;
+          redemptions_count: number;
+          starts_at: string | null;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          active?: boolean;
+          code: string;
+          created_at?: string;
+          discount_amount: number;
+          ends_at?: string | null;
+          redemption_limit: number;
+          redemptions_count?: number;
+          starts_at?: string | null;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          active?: boolean;
+          code?: string;
+          created_at?: string;
+          discount_amount?: number;
+          ends_at?: string | null;
+          redemption_limit?: number;
+          redemptions_count?: number;
+          starts_at?: string | null;
+          title?: string;
           updated_at?: string;
         };
         Relationships: [];
@@ -440,6 +493,31 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      create_order_with_promotion: {
+        Args: {
+          p_additional_instructions: string;
+          p_client_request_id: string | null;
+          p_customer_name: string;
+          p_customer_phone: string;
+          p_delivery_date: string;
+          p_delivery_location: string;
+          p_delivery_window: string;
+          p_items: Json;
+          p_payment_method: string;
+          p_subtotal: number;
+        };
+        Returns: {
+          additional_instructions: string;
+          created_at: string;
+          discount_amount: number;
+          id: string;
+          order_number: string;
+          payment_status: Database["public"]["Enums"]["payment_status"];
+          promotion_code: string | null;
+          subtotal: number;
+          total: number;
+        }[];
+      };
       next_order_number: { Args: never; Returns: string };
     };
     Enums: {

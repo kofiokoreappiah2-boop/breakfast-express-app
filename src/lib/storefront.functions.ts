@@ -36,10 +36,22 @@ export type StorefrontGalleryItem = {
   imageUrl: string | null;
 };
 
+export type StorefrontPromotion = {
+  code: string;
+  title: string;
+  discountAmount: number;
+  redemptionLimit: number;
+  redemptionsCount: number;
+  remaining: number;
+  available: boolean;
+  fullyClaimed: boolean;
+};
+
 export type Storefront = {
   settings: StorefrontSettings;
   products: StorefrontProduct[];
   gallery: StorefrontGalleryItem[];
+  promotion: StorefrontPromotion | null;
   locations: string[];
   windows: string[];
 };
@@ -51,35 +63,47 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
     const { signImagePaths } = await import("@/lib/images.server");
     const { getDeliverySchedule } = await import("@/lib/delivery-schedule");
 
-    const [settingsRes, productsRes, locationsRes, windowsRes, exceptionsRes, galleryRes] =
-      await Promise.all([
-        supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
-        supabaseAdmin
-          .from("products")
-          .select("id, name, description, size, price, available, image_path, sort_order")
-          .order("sort_order", { ascending: true }),
-        supabaseAdmin
-          .from("delivery_locations")
-          .select("name, active, sort_order")
-          .eq("active", true)
-          .order("sort_order", { ascending: true }),
-        supabaseAdmin
-          .from("delivery_windows")
-          .select("id, label, start_time, active, sort_order")
-          .eq("active", true)
-          .order("sort_order", { ascending: true }),
-        supabaseAdmin
-          .from("delivery_window_exceptions")
-          .select("window_id, exception_date, available")
-          .gte("exception_date", new Date().toISOString().slice(0, 10)),
-        supabaseAdmin
-          .from("gallery_items")
-          .select(
-            "id, title, caption, link_url, image_path, active, sort_order, starts_at, ends_at",
-          )
-          .eq("active", true)
-          .order("sort_order", { ascending: true }),
-      ]);
+    const [
+      settingsRes,
+      productsRes,
+      locationsRes,
+      windowsRes,
+      exceptionsRes,
+      galleryRes,
+      promotionRes,
+    ] = await Promise.all([
+      supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
+      supabaseAdmin
+        .from("products")
+        .select("id, name, description, size, price, available, image_path, sort_order")
+        .order("sort_order", { ascending: true }),
+      supabaseAdmin
+        .from("delivery_locations")
+        .select("name, active, sort_order")
+        .eq("active", true)
+        .order("sort_order", { ascending: true }),
+      supabaseAdmin
+        .from("delivery_windows")
+        .select("id, label, start_time, active, sort_order")
+        .eq("active", true)
+        .order("sort_order", { ascending: true }),
+      supabaseAdmin
+        .from("delivery_window_exceptions")
+        .select("window_id, exception_date, available")
+        .gte("exception_date", new Date().toISOString().slice(0, 10)),
+      supabaseAdmin
+        .from("gallery_items")
+        .select("id, title, caption, link_url, image_path, active, sort_order, starts_at, ends_at")
+        .eq("active", true)
+        .order("sort_order", { ascending: true }),
+      supabaseAdmin
+        .from("promotions")
+        .select(
+          "code, title, discount_amount, redemption_limit, redemptions_count, active, starts_at, ends_at",
+        )
+        .eq("code", "FOUNDERS_DAY_2026")
+        .maybeSingle(),
+    ]);
 
     const s = settingsRes.data;
     const products = productsRes.data ?? [];
@@ -94,6 +118,11 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
       ...(heroPath ? [heroPath] : []),
     ]);
     const now = Date.now();
+    const promo = promotionRes.data;
+    const promoStarted = !promo?.starts_at || new Date(promo.starts_at).getTime() <= now;
+    const promoNotEnded = !promo?.ends_at || new Date(promo.ends_at).getTime() > now;
+    const promoFullyClaimed = promo ? promo.redemptions_count >= promo.redemption_limit : false;
+    const promotionVisible = !!promo && promoStarted && promoNotEnded;
 
     const windows = (windowsRes.data ?? []).filter((window) => {
       const schedule = getDeliverySchedule(window.start_time);
@@ -148,6 +177,18 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
           linkUrl: item.link_url,
           imageUrl: item.image_path ? (signed[item.image_path] ?? null) : null,
         })),
+      promotion: promotionVisible
+        ? {
+            code: promo.code,
+            title: promo.title,
+            discountAmount: Number(promo.discount_amount),
+            redemptionLimit: promo.redemption_limit,
+            redemptionsCount: promo.redemptions_count,
+            remaining: Math.max(0, promo.redemption_limit - promo.redemptions_count),
+            available: promo.active && !promoFullyClaimed,
+            fullyClaimed: promoFullyClaimed,
+          }
+        : null,
       locations: (locationsRes.data ?? []).map((l) => l.name),
       windows: windows.map((window) => window.label),
     };

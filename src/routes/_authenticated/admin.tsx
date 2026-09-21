@@ -54,6 +54,8 @@ type OrderRow = {
   payment_status: PaymentStatus;
   additional_instructions: string;
   subtotal: number;
+  discount_amount: number;
+  promotion_code: string | null;
   total: number;
   status: OrderStatus;
   created_at: string;
@@ -97,7 +99,7 @@ function AdminPage() {
       const { data, error } = await supabase
         .from("orders")
         .select(
-          "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, payment_status, additional_instructions, subtotal, total, status, created_at, order_items(id, product_name, quantity, unit_price, subtotal)",
+          "id, order_number, customer_name, customer_phone, delivery_location, delivery_window, payment_method, payment_status, additional_instructions, subtotal, discount_amount, promotion_code, total, status, created_at, order_items(id, product_name, quantity, unit_price, subtotal)",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -521,6 +523,13 @@ function AdminPage() {
                     <Line label="Delivery" value={order.delivery_window} />
                     <Line label="Payment" value={order.payment_method} />
                     <Line label="Payment status" value={order.payment_status} />
+                    <Line label="Subtotal" value={formatCedis(Number(order.subtotal))} />
+                    {Number(order.discount_amount) > 0 ? (
+                      <Line
+                        label="Founder's Day discount"
+                        value={`−${formatCedis(Number(order.discount_amount))}`}
+                      />
+                    ) : null}
                     <Line label="Total" value={formatCedis(Number(order.total))} />
                   </dl>
                   <OrderItems order={order} />
@@ -587,6 +596,11 @@ function AdminPage() {
                         </td>
                         <td className="px-4 py-3 font-semibold">
                           {formatCedis(Number(order.total))}
+                          {Number(order.discount_amount) > 0 ? (
+                            <span className="mt-1 block text-xs font-medium text-primary">
+                              Founder&apos;s Day −{formatCedis(Number(order.discount_amount))}
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3">
                           <StatusSelect
@@ -599,6 +613,7 @@ function AdminPage() {
                         <tr>
                           <td colSpan={8} className="bg-secondary/40 px-4 py-3">
                             <OrderItems order={order} />
+                            <OrderTotals order={order} />
                             <Instructions order={order} />
                             <OrderHistory orderId={order.id} />
                           </td>
@@ -654,6 +669,21 @@ function OrderItems({ order }: { order: OrderRow }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function OrderTotals({ order }: { order: OrderRow }) {
+  return (
+    <dl className="mt-3 space-y-1 rounded-xl border border-border bg-card p-3 text-sm">
+      <Line label="Subtotal" value={formatCedis(Number(order.subtotal))} />
+      {Number(order.discount_amount) > 0 ? (
+        <Line
+          label="Founder's Day discount"
+          value={`−${formatCedis(Number(order.discount_amount))}`}
+        />
+      ) : null}
+      <Line label="Final total" value={formatCedis(Number(order.total))} />
+    </dl>
   );
 }
 

@@ -34,18 +34,22 @@ const fieldClass =
 
 function CheckoutPage() {
   const navigate = useNavigate();
-  const { items, subtotal, total, clearCart } = useCart();
+  const { items, subtotal, clearCart } = useCart();
   const submitOrder = useServerFn(createOrder);
   const { data: storefront } = useStorefront();
   const settings = storefront?.settings;
   const locations = storefront?.locations ?? [];
   const windows = storefront?.windows ?? [];
   const paymentMethods: PaymentMethod[] = PAYMENT_METHODS.filter((method) =>
-    method === "Mobile Money"
-      ? (settings?.momoEnabled ?? true)
-      : (settings?.podEnabled ?? true),
+    method === "Mobile Money" ? (settings?.momoEnabled ?? true) : (settings?.podEnabled ?? true),
   );
   const acceptingOrders = settings?.acceptingOrders ?? true;
+  const promotion = storefront?.promotion;
+  const estimatedDiscount =
+    promotion?.available && promotion.remaining > 0
+      ? Math.min(promotion.discountAmount, subtotal)
+      : 0;
+  const estimatedTotal = subtotal - estimatedDiscount;
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -114,7 +118,6 @@ function CheckoutPage() {
       setSubmitting(false);
     }
   }
-
 
   return (
     <div className="min-h-screen">
@@ -207,10 +210,7 @@ function CheckoutPage() {
                 </select>
               </Field>
 
-              <Field
-                label="Additional delivery instructions (optional)"
-                htmlFor="instructions"
-              >
+              <Field label="Additional delivery instructions (optional)" htmlFor="instructions">
                 <textarea
                   id="instructions"
                   rows={3}
@@ -259,7 +259,8 @@ function CheckoutPage() {
                     <span className="font-bold">{settings?.momoNumber ?? BUSINESS.momoNumber}</span>
                   </p>
                   <p>
-                    Account Name: <span className="font-bold">
+                    Account Name:{" "}
+                    <span className="font-bold">
                       {settings?.momoAccountName ?? BUSINESS.momoAccountName}
                     </span>
                   </p>
@@ -289,12 +290,24 @@ function CheckoutPage() {
                 <span>Subtotal</span>
                 <span className="font-semibold text-foreground">{formatCedis(subtotal)}</span>
               </div>
+              {estimatedDiscount > 0 ? (
+                <div className="flex items-center justify-between text-sm font-semibold text-primary">
+                  <span>Founder&apos;s Day discount</span>
+                  <span>−{formatCedis(estimatedDiscount)}</span>
+                </div>
+              ) : null}
               <div className="flex items-center justify-between border-t border-border pt-3">
                 <span className="font-semibold">Total</span>
                 <span className="font-display text-2xl font-bold text-primary">
-                  {formatCedis(total)}
+                  {formatCedis(estimatedTotal)}
                 </span>
               </div>
+              {estimatedDiscount > 0 && promotion ? (
+                <p className="text-xs text-muted-foreground">
+                  {promotion.remaining} offer{promotion.remaining === 1 ? "" : "s"} remaining. The
+                  discount is secured when this order is successfully placed.
+                </p>
+              ) : null}
               {errors["items"] ? (
                 <p className="text-sm font-medium text-destructive">{errors["items"]}</p>
               ) : null}
@@ -303,7 +316,9 @@ function CheckoutPage() {
                 disabled={submitting}
                 className="mt-3 h-13 w-full rounded-xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-lift transition-transform active:scale-[0.99] disabled:opacity-60"
               >
-                {submitting ? "Placing your order…" : `Place order · ${formatCedis(total)}`}
+                {submitting
+                  ? "Placing your order…"
+                  : `Place order · ${formatCedis(estimatedTotal)}`}
               </button>
             </div>
           </form>

@@ -194,23 +194,27 @@ export const createOrder = createServerFn({ method: "POST" })
 
     const subtotal = money(rows.reduce((sum, r) => sum + r.subtotal, 0));
 
+    // The database function creates the order, its items and (when available)
+    // one of the ten promotional redemptions in a single transaction.
     const { data: order, error: orderError } = await supabaseAdmin
-      .from("orders")
-      .insert({
-        customer_name: data.customerName,
-        customer_phone: data.customerPhone,
-        delivery_location: data.deliveryLocation,
-        delivery_window: data.deliveryWindow,
-        delivery_date: schedule.deliveryDate,
-        payment_method: data.paymentMethod,
-        additional_instructions: data.additionalInstructions ?? "",
-        client_request_id: data.clientRequestId ?? null,
-        subtotal,
-        total: subtotal,
+      .rpc("create_order_with_promotion", {
+        p_customer_name: data.customerName,
+        p_customer_phone: data.customerPhone,
+        p_delivery_location: data.deliveryLocation,
+        p_delivery_window: data.deliveryWindow,
+        p_delivery_date: schedule.deliveryDate,
+        p_payment_method: data.paymentMethod,
+        p_additional_instructions: data.additionalInstructions ?? "",
+        p_client_request_id: data.clientRequestId ?? null,
+        p_subtotal: subtotal,
+        p_items: rows.map((r) => ({
+          product_id: r.product_id,
+          product_name: r.product_name,
+          quantity: r.quantity,
+          unit_price: r.unit_price,
+          subtotal: r.subtotal,
+        })),
       })
-      .select(
-        "id, order_number, subtotal, total, created_at, payment_status, additional_instructions",
-      )
       .single();
 
     if (orderError || !order) {
@@ -226,23 +230,6 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error("We couldn't place your order. Please try again.");
     }
 
-    const { error: itemsError } = await supabaseAdmin.from("order_items").insert(
-      rows.map((r) => ({
-        order_id: order.id,
-        product_id: r.product_id,
-        product_name: r.product_name,
-        quantity: r.quantity,
-        unit_price: r.unit_price,
-        subtotal: r.subtotal,
-      })),
-    );
-
-    if (itemsError) {
-      console.error("[checkout] items insert failed", JSON.stringify(itemsError));
-      await supabaseAdmin.from("orders").delete().eq("id", order.id);
-      throw new Error("We couldn't save your order items. Please try again.");
-    }
-
     const receipt = {
       orderNumber: order.order_number,
       customerName: data.customerName,
@@ -256,6 +243,8 @@ export const createOrder = createServerFn({ method: "POST" })
       additionalInstructions: order.additional_instructions ?? "",
       total: Number(order.total),
       subtotal: Number(order.subtotal),
+      discountAmount: Number(order.discount_amount),
+      promotionCode: order.promotion_code,
       items: rows.map((r) => ({
         name: r.name,
         size: r.size,
