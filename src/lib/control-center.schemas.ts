@@ -61,6 +61,21 @@ export const imageUploadSchema = z.object({
 
 export const idSchema = z.object({ id: z.string().uuid() });
 
+export function normalizeGhanaPhone(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (/^233\d{9}$/.test(digits)) return `0${digits.slice(3)}`;
+  if (/^\d{9}$/.test(digits)) return `0${digits}`;
+  return digits;
+}
+
+export const promotionExclusionSchema = z.object({
+  phone: z
+    .string()
+    .trim()
+    .transform(normalizeGhanaPhone)
+    .pipe(z.string().regex(/^0\d{9}$/, "Enter a valid 10-digit Ghana phone number.")),
+});
+
 export const galleryItemSchema = z
   .object({
     id: z.string().uuid().optional(),

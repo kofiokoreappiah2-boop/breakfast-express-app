@@ -416,6 +416,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      promotion_exclusions: {
+        Row: {
+          created_at: string;
+          phone_normalized: string;
+          promotion_code: string;
+        };
+        Insert: {
+          created_at?: string;
+          phone_normalized: string;
+          promotion_code: string;
+        };
+        Update: {
+          created_at?: string;
+          phone_normalized?: string;
+          promotion_code?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "promotion_exclusions_promotion_code_fkey";
+            columns: ["promotion_code"];
+            isOneToOne: false;
+            referencedRelation: "promotions";
+            referencedColumns: ["code"];
+          },
+        ];
+      };
       promotions: {
         Row: {
           active: boolean;

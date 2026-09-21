@@ -43,6 +43,9 @@ export type StorefrontPromotion = {
   redemptionLimit: number;
   redemptionsCount: number;
   remaining: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  started: boolean;
   available: boolean;
   fullyClaimed: boolean;
 };
@@ -122,7 +125,7 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
     const promoStarted = !promo?.starts_at || new Date(promo.starts_at).getTime() <= now;
     const promoNotEnded = !promo?.ends_at || new Date(promo.ends_at).getTime() > now;
     const promoFullyClaimed = promo ? promo.redemptions_count >= promo.redemption_limit : false;
-    const promotionVisible = !!promo && promoStarted && promoNotEnded;
+    const promotionVisible = !!promo && promo.active && promoNotEnded;
 
     const windows = (windowsRes.data ?? []).filter((window) => {
       const schedule = getDeliverySchedule(window.start_time);
@@ -185,7 +188,10 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
             redemptionLimit: promo.redemption_limit,
             redemptionsCount: promo.redemptions_count,
             remaining: Math.max(0, promo.redemption_limit - promo.redemptions_count),
-            available: promo.active && !promoFullyClaimed,
+            startsAt: promo.starts_at,
+            endsAt: promo.ends_at,
+            started: promoStarted,
+            available: promoStarted && !promoFullyClaimed,
             fullyClaimed: promoFullyClaimed,
           }
         : null,

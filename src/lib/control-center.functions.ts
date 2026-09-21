@@ -5,6 +5,7 @@ import {
   galleryItemSchema,
   imageUploadSchema,
   locationSchema,
+  promotionExclusionSchema,
   productSchema,
   settingsSchema,
   windowExceptionSchema,
@@ -34,6 +35,11 @@ export type AdminGalleryItem = {
   startsAt: string | null;
   endsAt: string | null;
   imageUrl: string | null;
+};
+
+export type AdminPromotionExclusion = {
+  phone: string;
+  createdAt: string;
 };
 
 export type AdminWindow = {
@@ -69,21 +75,30 @@ export const getControlCenter = createServerFn({ method: "GET" })
     const { signImagePaths } = await import("@/lib/images.server");
     const { getDeliverySchedule } = await import("@/lib/delivery-schedule");
 
-    const [settingsRes, productsRes, locationsRes, windowsRes, exceptionsRes, galleryRes] =
-      await Promise.all([
-        supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
-        supabaseAdmin.from("products").select("*").order("sort_order", { ascending: true }),
-        supabaseAdmin
-          .from("delivery_locations")
-          .select("*")
-          .order("sort_order", { ascending: true }),
-        supabaseAdmin.from("delivery_windows").select("*").order("sort_order", { ascending: true }),
-        supabaseAdmin
-          .from("delivery_window_exceptions")
-          .select("*")
-          .order("exception_date", { ascending: true }),
-        supabaseAdmin.from("gallery_items").select("*").order("sort_order", { ascending: true }),
-      ]);
+    const [
+      settingsRes,
+      productsRes,
+      locationsRes,
+      windowsRes,
+      exceptionsRes,
+      galleryRes,
+      exclusionsRes,
+    ] = await Promise.all([
+      supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
+      supabaseAdmin.from("products").select("*").order("sort_order", { ascending: true }),
+      supabaseAdmin.from("delivery_locations").select("*").order("sort_order", { ascending: true }),
+      supabaseAdmin.from("delivery_windows").select("*").order("sort_order", { ascending: true }),
+      supabaseAdmin
+        .from("delivery_window_exceptions")
+        .select("*")
+        .order("exception_date", { ascending: true }),
+      supabaseAdmin.from("gallery_items").select("*").order("sort_order", { ascending: true }),
+      supabaseAdmin
+        .from("promotion_exclusions")
+        .select("phone_normalized, created_at")
+        .eq("promotion_code", "FOUNDERS_DAY_2026")
+        .order("phone_normalized", { ascending: true }),
+    ]);
 
     const products = productsRes.data ?? [];
     const s = settingsRes.data;
@@ -134,6 +149,10 @@ export const getControlCenter = createServerFn({ method: "GET" })
         startsAt: item.starts_at,
         endsAt: item.ends_at,
         imageUrl: item.image_path ? (signed[item.image_path] ?? null) : null,
+      })),
+      promotionExclusions: (exclusionsRes.data ?? []).map((row): AdminPromotionExclusion => ({
+        phone: row.phone_normalized,
+        createdAt: row.created_at,
       })),
       locations: (locationsRes.data ?? []).map((l): AdminLocation => ({
         id: l.id,
@@ -346,6 +365,42 @@ export const deleteGalleryItem = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("gallery_items").delete().eq("id", data.id);
     if (error) throw new Error("Could not remove the advert.");
     await removeImage(existing?.image_path);
+    return { ok: true };
+  });
+
+export const addPromotionExclusion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => promotionExclusionSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin.from("promotion_exclusions").upsert(
+      {
+        promotion_code: "FOUNDERS_DAY_2026",
+        phone_normalized: data.phone,
+      },
+      { onConflict: "promotion_code,phone_normalized", ignoreDuplicates: true },
+    );
+    if (error) throw new Error("Could not add the excluded phone number.");
+    return { ok: true };
+  });
+
+export const deletePromotionExclusion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => promotionExclusionSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("promotion_exclusions")
+      .delete()
+      .eq("promotion_code", "FOUNDERS_DAY_2026")
+      .eq("phone_normalized", data.phone);
+    if (error) throw new Error("Could not remove the excluded phone number.");
     return { ok: true };
   });
 

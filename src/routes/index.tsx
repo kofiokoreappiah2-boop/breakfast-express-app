@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Clock, ExternalLink, ImageOff, MapPin, Phone, ShoppingBag } from "lucide-react";
 
@@ -35,6 +36,35 @@ const STEPS = [
   { title: "Tell us where", body: "Select your hall and the delivery period that suits you." },
   { title: "Eat well", body: "Pay by MoMo or on delivery. We bring it hot and fresh." },
 ];
+
+function PromotionCountdown({ startsAt }: { startsAt: string }) {
+  const [remaining, setRemaining] = useState(() =>
+    Math.max(0, new Date(startsAt).getTime() - Date.now()),
+  );
+
+  useEffect(() => {
+    let reloaded = false;
+    const update = () => {
+      const next = Math.max(0, new Date(startsAt).getTime() - Date.now());
+      setRemaining(next);
+      if (next === 0 && !reloaded) {
+        reloaded = true;
+        window.setTimeout(() => window.location.reload(), 500);
+      }
+    };
+    update();
+    const timer = window.setInterval(update, 1_000);
+    return () => window.clearInterval(timer);
+  }, [startsAt]);
+
+  const totalSeconds = Math.ceil(remaining / 1_000);
+  const hours = Math.floor(totalSeconds / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  const time = [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+
+  return <span>Offer begins in {time}</span>;
+}
 
 function HomePage() {
   const { itemCount, total } = useCart();
@@ -105,7 +135,24 @@ function HomePage() {
 
         {promotion ? (
           <section className="mx-auto max-w-5xl px-4 py-4" aria-label="Founder's Day offer">
-            {promotion.available ? (
+            {!promotion.started && promotion.startsAt ? (
+              <a
+                href="#menu"
+                className="surface-card group relative block scroll-mt-20 overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring"
+                aria-label="Founder's Day promotion begins at 7 AM Ghana time. Go to the menu."
+              >
+                <img
+                  src="/founders-day-promo.webp"
+                  alt="Be one of the first 10 app customers and get GH₵5 off your Einyornose breakfast"
+                  width={1600}
+                  height={800}
+                  className="h-auto w-full transition-transform duration-300 group-hover:scale-[1.01]"
+                />
+                <span className="absolute bottom-3 right-3 rounded-full bg-card/95 px-3 py-1.5 text-xs font-bold text-foreground shadow-lift sm:bottom-5 sm:right-5 sm:text-sm">
+                  <PromotionCountdown startsAt={promotion.startsAt} />
+                </span>
+              </a>
+            ) : promotion.available ? (
               <a
                 href="#menu"
                 className="surface-card group relative block scroll-mt-20 overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring"

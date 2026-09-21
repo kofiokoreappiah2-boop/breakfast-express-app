@@ -5,6 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import {
+  addPromotionExclusion,
+  deletePromotionExclusion,
   deleteGalleryItem,
   deleteProduct,
   deleteWindowException,
@@ -18,6 +20,7 @@ import {
   uploadImage,
   type AdminLocation,
   type AdminGalleryItem,
+  type AdminPromotionExclusion,
   type AdminProduct,
   type AdminWindow,
   type ControlCenterData,
@@ -115,11 +118,92 @@ function ControlCenterPage() {
         <StoreSection settings={data.settings} onSaved={refresh} />
         <MenuSection products={data.products} onSaved={refresh} />
         <GallerySection gallery={data.gallery} onSaved={refresh} />
+        <PromotionExclusionsSection exclusions={data.promotionExclusions} onSaved={refresh} />
         <LocationsSection locations={data.locations} onSaved={refresh} />
         <WindowsSection windows={data.windows} onSaved={refresh} />
         <StaffSection />
       </main>
     </div>
+  );
+}
+
+function PromotionExclusionsSection({
+  exclusions,
+  onSaved,
+}: {
+  exclusions: AdminPromotionExclusion[];
+  onSaved: () => void;
+}) {
+  const add = useServerFn(addPromotionExclusion);
+  const remove = useServerFn(deletePromotionExclusion);
+  const [phone, setPhone] = useState("");
+
+  const addMutation = useMutation({
+    mutationFn: () => add({ data: { phone } }),
+    onSuccess: () => {
+      toast.success("Phone number excluded from the promotion");
+      setPhone("");
+      onSaved();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not add the phone number."),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (excludedPhone: string) => remove({ data: { phone: excludedPhone } }),
+    onSuccess: () => {
+      toast.success("Phone number can now qualify for the promotion");
+      onSaved();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not remove the phone number."),
+  });
+
+  return (
+    <Card
+      title="Founder’s Day exclusions"
+      description="Orders using these phone numbers remain valid but receive no discount and do not consume an offer."
+    >
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <label className={`${label} flex-1`}>
+          Phone number
+          <input
+            inputMode="tel"
+            className={`${input} mt-1`}
+            value={phone}
+            placeholder="0241234567 or +233241234567"
+            onChange={(event) => setPhone(event.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className={`${button} sm:mt-6`}
+          disabled={addMutation.isPending || phone.trim() === ""}
+          onClick={() => addMutation.mutate()}
+        >
+          {addMutation.isPending ? "Adding…" : "Exclude number"}
+        </button>
+      </div>
+
+      <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+        {exclusions.map((item) => (
+          <li
+            key={item.phone}
+            className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+          >
+            <span className="font-medium tabular-nums">{item.phone}</span>
+            <button
+              type="button"
+              className={ghost}
+              disabled={removeMutation.isPending}
+              onClick={() => removeMutation.mutate(item.phone)}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
