@@ -8,6 +8,8 @@ export type StoredReceipt = {
   deliveryWindow: string;
   paymentMethod: string;
   paymentStatus: string;
+  momoNumber?: string;
+  momoAccountName?: string;
   additionalInstructions: string;
   subtotal: number;
   total: number;

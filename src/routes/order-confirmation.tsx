@@ -105,7 +105,6 @@ function ConfirmationPage() {
     toast.error("Sharing isn't available here — use Save / Print order instead.");
   }
 
-
   return (
     <div className="min-h-screen">
       <div className="print:hidden">
@@ -146,7 +145,6 @@ function ConfirmationPage() {
                 value={receipt.additionalInstructions || "None"}
               />
 
-
               <div className="border-t border-border pt-3">
                 <p className="text-sm font-semibold">Items ordered</p>
                 <ul className="mt-2 divide-y divide-border">
@@ -177,10 +175,14 @@ function ConfirmationPage() {
               <div className="surface-card mt-4 p-5 text-sm">
                 <p className="font-semibold">Complete your Mobile Money payment</p>
                 <p className="mt-2">
-                  MoMo Number: <span className="font-bold">{BUSINESS.momoNumber}</span>
+                  MoMo Number:{" "}
+                  <span className="font-bold">{receipt.momoNumber ?? BUSINESS.momoNumber}</span>
                 </p>
                 <p>
-                  Account Name: <span className="font-bold">{BUSINESS.momoAccountName}</span>
+                  Account Name:{" "}
+                  <span className="font-bold">
+                    {receipt.momoAccountName ?? BUSINESS.momoAccountName}
+                  </span>
                 </p>
               </div>
             ) : null}

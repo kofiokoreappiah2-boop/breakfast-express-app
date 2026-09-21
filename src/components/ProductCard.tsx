@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { QuantityStepper } from "@/components/QuantityStepper";
 import { useCart } from "@/lib/cart";
 import { formatCedis } from "@/lib/format";
-import { productImage } from "@/lib/product-images";
+import { ImageOff } from "lucide-react";
 
 export type Product = {
   id: string;
@@ -22,14 +22,21 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <article className="surface-card flex flex-col overflow-hidden">
-      <img
-        src={product.imageUrl ?? productImage(product.name)}
-        alt={label}
-        loading="lazy"
-        width={800}
-        height={800}
-        className="h-40 w-full object-cover sm:h-44"
-      />
+      {product.imageUrl ? (
+        <img
+          src={product.imageUrl}
+          alt={label}
+          loading="lazy"
+          width={800}
+          height={800}
+          className="h-40 w-full object-cover sm:h-44"
+        />
+      ) : (
+        <div className="grid h-40 w-full place-items-center bg-secondary text-muted-foreground sm:h-44">
+          <ImageOff className="h-8 w-8" aria-hidden="true" />
+          <span className="sr-only">No image available for {label}</span>
+        </div>
+      )}
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="min-w-0">
           <h3 className="text-lg font-semibold leading-snug">{product.name}</h3>
@@ -43,9 +50,7 @@ export function ProductCard({ product }: { product: Product }) {
           </p>
         </div>
 
-        <p className="font-display text-2xl font-bold text-primary">
-          {formatCedis(product.price)}
-        </p>
+        <p className="font-display text-2xl font-bold text-primary">{formatCedis(product.price)}</p>
 
         <div className="mt-auto flex flex-wrap items-center gap-2">
           <QuantityStepper value={quantity} onChange={setQuantity} label={label} />

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   idSchema,
+  galleryItemSchema,
   imageUploadSchema,
   locationSchema,
   productSchema,
@@ -23,6 +24,18 @@ export type AdminProduct = {
 
 export type AdminLocation = { id: string; name: string; active: boolean; sortOrder: number };
 
+export type AdminGalleryItem = {
+  id: string;
+  title: string;
+  caption: string;
+  linkUrl: string;
+  active: boolean;
+  sortOrder: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  imageUrl: string | null;
+};
+
 export type AdminWindow = {
   id: string;
   label: string;
@@ -30,6 +43,10 @@ export type AdminWindow = {
   endTime: string;
   active: boolean;
   sortOrder: number;
+  deliveryDate: string;
+  automaticallyAvailable: boolean;
+  effectiveAvailable: boolean;
+  manualOverride: boolean | null;
   exceptions: { id: string; date: string; available: boolean; note: string }[];
 };
 
@@ -50,22 +67,33 @@ export const getControlCenter = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { signImagePaths } = await import("@/lib/images.server");
+    const { getDeliverySchedule } = await import("@/lib/delivery-schedule");
 
-    const [settingsRes, productsRes, locationsRes, windowsRes, exceptionsRes] = await Promise.all([
-      supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
-      supabaseAdmin.from("products").select("*").order("sort_order", { ascending: true }),
-      supabaseAdmin.from("delivery_locations").select("*").order("sort_order", { ascending: true }),
-      supabaseAdmin.from("delivery_windows").select("*").order("sort_order", { ascending: true }),
-      supabaseAdmin
-        .from("delivery_window_exceptions")
-        .select("*")
-        .order("exception_date", { ascending: true }),
-    ]);
+    const [settingsRes, productsRes, locationsRes, windowsRes, exceptionsRes, galleryRes] =
+      await Promise.all([
+        supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
+        supabaseAdmin.from("products").select("*").order("sort_order", { ascending: true }),
+        supabaseAdmin
+          .from("delivery_locations")
+          .select("*")
+          .order("sort_order", { ascending: true }),
+        supabaseAdmin.from("delivery_windows").select("*").order("sort_order", { ascending: true }),
+        supabaseAdmin
+          .from("delivery_window_exceptions")
+          .select("*")
+          .order("exception_date", { ascending: true }),
+        supabaseAdmin.from("gallery_items").select("*").order("sort_order", { ascending: true }),
+      ]);
 
     const products = productsRes.data ?? [];
     const s = settingsRes.data;
     const paths = products.map((p) => p.image_path).filter((p): p is string => !!p);
     if (s?.hero_image_path) paths.push(s.hero_image_path);
+    paths.push(
+      ...(galleryRes.data ?? [])
+        .map((item) => item.image_path)
+        .filter((path): path is string => !!path),
+    );
     const signed = await signImagePaths(paths);
 
     return {
@@ -86,34 +114,60 @@ export const getControlCenter = createServerFn({ method: "GET" })
         promoMessage: s?.promo_message ?? "",
         heroImageUrl: s?.hero_image_path ? (signed[s.hero_image_path] ?? null) : null,
       },
-      products: products.map(
-        (p): AdminProduct => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          size: p.size,
-          price: Number(p.price),
-          available: p.available,
-          sortOrder: p.sort_order,
-          imageUrl: p.image_path ? (signed[p.image_path] ?? null) : null,
-        }),
-      ),
-      locations: (locationsRes.data ?? []).map(
-        (l): AdminLocation => ({ id: l.id, name: l.name, active: l.active, sortOrder: l.sort_order }),
-      ),
-      windows: (windowsRes.data ?? []).map(
-        (w): AdminWindow => ({
+      products: products.map((p): AdminProduct => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        size: p.size,
+        price: Number(p.price),
+        available: p.available,
+        sortOrder: p.sort_order,
+        imageUrl: p.image_path ? (signed[p.image_path] ?? null) : null,
+      })),
+      gallery: (galleryRes.data ?? []).map((item): AdminGalleryItem => ({
+        id: item.id,
+        title: item.title,
+        caption: item.caption,
+        linkUrl: item.link_url,
+        active: item.active,
+        sortOrder: item.sort_order,
+        startsAt: item.starts_at,
+        endsAt: item.ends_at,
+        imageUrl: item.image_path ? (signed[item.image_path] ?? null) : null,
+      })),
+      locations: (locationsRes.data ?? []).map((l): AdminLocation => ({
+        id: l.id,
+        name: l.name,
+        active: l.active,
+        sortOrder: l.sort_order,
+      })),
+      windows: (windowsRes.data ?? []).map((w): AdminWindow => {
+        const schedule = getDeliverySchedule(w.start_time);
+        const matchingException = (exceptionsRes.data ?? []).find(
+          (e) => e.window_id === w.id && e.exception_date === schedule.deliveryDate,
+        );
+        return {
           id: w.id,
           label: w.label,
           startTime: String(w.start_time).slice(0, 5),
           endTime: String(w.end_time).slice(0, 5),
           active: w.active,
           sortOrder: w.sort_order,
+          deliveryDate: schedule.deliveryDate,
+          automaticallyAvailable: schedule.automaticallyAvailable,
+          effectiveAvailable:
+            w.active && (matchingException?.available ?? schedule.automaticallyAvailable),
+          manualOverride: matchingException?.available ?? null,
           exceptions: (exceptionsRes.data ?? [])
             .filter((e) => e.window_id === w.id)
-            .map((e) => ({ id: e.id, date: e.exception_date, available: e.available, note: e.note })),
-        }),
-      ),
+            .map((e) => ({
+              id: e.id,
+              date: e.exception_date,
+              available: e.available,
+              note: e.note,
+            })),
+        };
+      }),
     };
   });
 
@@ -219,6 +273,23 @@ export const uploadImage = createServerFn({ method: "POST" })
       return { ok: true };
     }
 
+    if (data.target === "gallery") {
+      if (!data.galleryId) throw new Error("Save the advert before uploading its image.");
+      const { data: existing } = await supabaseAdmin
+        .from("gallery_items")
+        .select("image_path")
+        .eq("id", data.galleryId)
+        .maybeSingle();
+      const path = await storeImage("gallery", data.fileName, data.contentType, data.base64);
+      const { error } = await supabaseAdmin
+        .from("gallery_items")
+        .update({ image_path: path, updated_at: new Date().toISOString() })
+        .eq("id", data.galleryId);
+      if (error) throw new Error("Could not attach the advert image.");
+      await removeImage(existing?.image_path);
+      return { ok: true };
+    }
+
     const { data: settings } = await supabaseAdmin
       .from("business_settings")
       .select("hero_image_path")
@@ -231,6 +302,50 @@ export const uploadImage = createServerFn({ method: "POST" })
       .eq("id", true);
     if (error) throw new Error("Could not update the homepage image.");
     await removeImage(settings?.hero_image_path);
+    return { ok: true };
+  });
+
+export const saveGalleryItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => galleryItemSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const row = {
+      title: data.title,
+      caption: data.caption ?? "",
+      link_url: data.linkUrl ?? "",
+      active: data.active,
+      sort_order: data.sortOrder,
+      starts_at: data.startsAt,
+      ends_at: data.endsAt,
+      updated_at: new Date().toISOString(),
+    };
+    const query = data.id
+      ? supabaseAdmin.from("gallery_items").update(row).eq("id", data.id).select("id").single()
+      : supabaseAdmin.from("gallery_items").insert(row).select("id").single();
+    const { data: saved, error } = await query;
+    if (error || !saved) throw new Error("Could not save the advert.");
+    return { ok: true, id: saved.id };
+  });
+
+export const deleteGalleryItem = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => idSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertAdmin, removeImage } = await import("@/lib/control-center.server");
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing } = await supabaseAdmin
+      .from("gallery_items")
+      .select("image_path")
+      .eq("id", data.id)
+      .maybeSingle();
+    const { error } = await supabaseAdmin.from("gallery_items").delete().eq("id", data.id);
+    if (error) throw new Error("Could not remove the advert.");
+    await removeImage(existing?.image_path);
     return { ok: true };
   });
 

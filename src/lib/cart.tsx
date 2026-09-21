@@ -86,9 +86,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       quantity <= 0
         ? prev.filter((i) => i.productId !== productId)
         : prev.map((i) =>
-            i.productId === productId
-              ? { ...i, quantity: Math.min(100, Math.floor(quantity)) }
-              : i,
+            i.productId === productId ? { ...i, quantity: Math.min(100, Math.floor(quantity)) } : i,
           ),
     );
   }, []);

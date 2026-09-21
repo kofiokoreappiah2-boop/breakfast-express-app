@@ -21,13 +21,7 @@ export type ReportOrder = {
 };
 
 export type DatePreset =
-  | "all"
-  | "today"
-  | "yesterday"
-  | "this-week"
-  | "last-week"
-  | "this-month"
-  | "custom";
+  "all" | "today" | "yesterday" | "this-week" | "last-week" | "this-month" | "custom";
 
 export type OrderFilters = {
   preset: DatePreset;
@@ -143,6 +137,25 @@ export type ReportSummary = {
   pendingTotal: number;
 };
 
+export type ItemSummary = {
+  name: string;
+  quantity: number;
+};
+
+/** Combines item quantities across the orders currently visible in the report. */
+export function summariseItems(orders: ReportOrder[]): ItemSummary[] {
+  const quantities = new Map<string, number>();
+  for (const order of orders) {
+    if (order.status === "Cancelled") continue;
+    for (const item of order.order_items) {
+      quantities.set(item.product_name, (quantities.get(item.product_name) ?? 0) + item.quantity);
+    }
+  }
+  return [...quantities.entries()]
+    .map(([name, quantity]) => ({ name, quantity }))
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
+}
+
 export function summarise(orders: ReportOrder[]): ReportSummary {
   const live = orders.filter((o) => o.status !== "Cancelled");
   const paid = live.filter((o) => o.payment_status === "Paid");
@@ -207,8 +220,7 @@ export function buildCsv(orders: ReportOrder[]): string {
 const escapeHtml = (value: string) =>
   String(value ?? "").replace(
     /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
   );
 
 /** Groups orders by delivery location, then by delivery window. */
@@ -266,10 +278,10 @@ export function buildPrintHtml(
                     <td>${order.order_items
                       .map((i) => `${escapeHtml(i.product_name)} &times; ${i.quantity}`)
                       .join("<br>")}${
-                        order.additional_instructions
-                          ? `<div class="muted">Note: ${escapeHtml(order.additional_instructions)}</div>`
-                          : ""
-                      }</td>
+                      order.additional_instructions
+                        ? `<div class="muted">Note: ${escapeHtml(order.additional_instructions)}</div>`
+                        : ""
+                    }</td>
                     <td>${escapeHtml(formatCedis(Number(order.total)))}</td>
                     <td>${escapeHtml(order.payment_method)}</td>
                     <td>${escapeHtml(order.payment_status)}</td>

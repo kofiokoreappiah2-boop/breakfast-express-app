@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Clock, MapPin, Phone, ShoppingBag } from "lucide-react";
+import { Clock, ExternalLink, ImageOff, MapPin, Phone, ShoppingBag } from "lucide-react";
 
-import heroImage from "@/assets/hero-breakfast.jpg";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ProductCard } from "@/components/ProductCard";
@@ -43,6 +42,7 @@ function HomePage() {
 
   const settings = data?.settings;
   const products = data?.products ?? [];
+  const gallery = data?.gallery ?? [];
   const locations = data?.locations ?? [];
   const windows = data?.windows ?? [];
   const businessName = settings?.businessName ?? BUSINESS.name;
@@ -69,13 +69,19 @@ function HomePage() {
 
       <main>
         <section className="relative overflow-hidden">
-          <img
-            src={settings?.heroImageUrl ?? heroImage}
-            alt="A spread of Ghanaian breakfast: porridge, puff puff, koose and groundnuts"
-            width={1200}
-            height={912}
-            className="h-72 w-full object-cover sm:h-96"
-          />
+          {isLoading ? (
+            <div className="h-72 w-full animate-pulse bg-muted sm:h-96" />
+          ) : settings?.heroImageUrl ? (
+            <img
+              src={settings.heroImageUrl}
+              alt="A spread of Ghanaian breakfast: porridge, puff puff, koose and groundnuts"
+              width={1200}
+              height={912}
+              className="h-72 w-full object-cover sm:h-96"
+            />
+          ) : (
+            <div className="warm-gradient h-72 w-full sm:h-96" />
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10" />
           <div className="relative mx-auto -mt-28 max-w-5xl px-4 pb-8 sm:-mt-36">
             <h1 className="font-display text-4xl font-bold leading-tight sm:text-6xl">
@@ -120,6 +126,51 @@ function HomePage() {
             </div>
           )}
         </section>
+
+        {gallery.length > 0 ? (
+          <section className="mx-auto max-w-5xl px-4 py-6">
+            <h2 className="font-display text-2xl font-bold sm:text-3xl">Offers &amp; updates</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Current promotions and news from {businessName}.
+            </p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {gallery.map((item) => (
+                <article key={item.id} className="surface-card overflow-hidden">
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      loading="lazy"
+                      width={1200}
+                      height={800}
+                      className="h-48 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="grid h-48 place-items-center bg-secondary text-muted-foreground">
+                      <ImageOff className="h-8 w-8" aria-hidden="true" />
+                    </div>
+                  )}
+                  <div className="p-4">
+                    <h3 className="font-display text-lg font-bold">{item.title}</h3>
+                    {item.caption ? (
+                      <p className="mt-1 text-sm text-muted-foreground">{item.caption}</p>
+                    ) : null}
+                    {item.linkUrl ? (
+                      <a
+                        href={item.linkUrl}
+                        target={item.linkUrl.startsWith("http") ? "_blank" : undefined}
+                        rel={item.linkUrl.startsWith("http") ? "noreferrer" : undefined}
+                        className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                      >
+                        Learn more <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                      </a>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="mx-auto max-w-5xl px-4 py-6">
           <h2 className="font-display text-2xl font-bold">How ordering works</h2>
@@ -168,9 +219,7 @@ function HomePage() {
         <section id="contact" className="mx-auto max-w-5xl scroll-mt-20 px-4 py-6">
           <div className="surface-card warm-gradient p-6 text-primary-foreground">
             <h2 className="font-display text-xl font-bold">Questions? Talk to us</h2>
-            <p className="mt-1 text-sm opacity-90">
-              Call or WhatsApp {businessName} any morning.
-            </p>
+            <p className="mt-1 text-sm opacity-90">Call or WhatsApp {businessName} any morning.</p>
             <a
               href={whatsappUrl}
               target="_blank"

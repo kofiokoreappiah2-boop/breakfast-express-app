@@ -5,16 +5,19 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import {
+  deleteGalleryItem,
   deleteProduct,
   deleteWindowException,
   getControlCenter,
   saveBusinessSettings,
+  saveGalleryItem,
   saveLocation,
   saveProduct,
   saveWindow,
   saveWindowException,
   uploadImage,
   type AdminLocation,
+  type AdminGalleryItem,
   type AdminProduct,
   type AdminWindow,
   type ControlCenterData,
@@ -58,7 +61,10 @@ async function fileToBase64(file: File): Promise<string> {
 function ControlCenterPage() {
   const queryClient = useQueryClient();
   const load = useServerFn(getControlCenter);
-  const query = useQuery<ControlCenterData>({ queryKey: ["control-center"], queryFn: () => load() });
+  const query = useQuery<ControlCenterData>({
+    queryKey: ["control-center"],
+    queryFn: () => load(),
+  });
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["control-center"] });
@@ -108,16 +114,24 @@ function ControlCenterPage() {
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
         <StoreSection settings={data.settings} onSaved={refresh} />
         <MenuSection products={data.products} onSaved={refresh} />
+        <GallerySection gallery={data.gallery} onSaved={refresh} />
         <LocationsSection locations={data.locations} onSaved={refresh} />
         <WindowsSection windows={data.windows} onSaved={refresh} />
         <StaffSection />
-
       </main>
     </div>
   );
 }
 
-function Card({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function Card({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="surface-card p-5">
       <h2 className="font-display text-xl font-bold">{title}</h2>
@@ -348,7 +362,7 @@ function MenuSection({ products, onSaved }: { products: AdminProduct[]; onSaved:
   const save = useServerFn(saveProduct);
   const remove = useServerFn(deleteProduct);
   const upload = useServerFn(uploadImage);
-  const [draft, setDraft] = useState<(typeof emptyProduct) & { id?: string }>(emptyProduct);
+  const [draft, setDraft] = useState<typeof emptyProduct & { id?: string }>(emptyProduct);
 
   const saveMutation = useMutation({
     mutationFn: async () =>
@@ -543,6 +557,259 @@ function MenuSection({ products, onSaved }: { products: AdminProduct[]; onSaved:
   );
 }
 
+const emptyGalleryItem = {
+  title: "",
+  caption: "",
+  linkUrl: "",
+  active: true,
+  sortOrder: 0,
+  startsAt: "",
+  endsAt: "",
+};
+
+function toLocalDateTime(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function GallerySection({
+  gallery,
+  onSaved,
+}: {
+  gallery: AdminGalleryItem[];
+  onSaved: () => void;
+}) {
+  const save = useServerFn(saveGalleryItem);
+  const remove = useServerFn(deleteGalleryItem);
+  const upload = useServerFn(uploadImage);
+  const [draft, setDraft] = useState<typeof emptyGalleryItem & { id?: string }>(emptyGalleryItem);
+
+  const saveMutation = useMutation({
+    mutationFn: async (payload: typeof draft) =>
+      save({
+        data: {
+          ...(payload.id ? { id: payload.id } : {}),
+          title: payload.title,
+          caption: payload.caption,
+          linkUrl: payload.linkUrl,
+          active: payload.active,
+          sortOrder: Number(payload.sortOrder),
+          startsAt: payload.startsAt ? new Date(payload.startsAt).toISOString() : null,
+          endsAt: payload.endsAt ? new Date(payload.endsAt).toISOString() : null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Advert saved");
+      setDraft(emptyGalleryItem);
+      onSaved();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not save the advert."),
+  });
+
+  const imageMutation = useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) =>
+      upload({
+        data: {
+          target: "gallery",
+          galleryId: id,
+          fileName: file.name,
+          contentType: file.type,
+          base64: await fileToBase64(file),
+        },
+      }),
+    onSuccess: () => {
+      toast.success("Advert image updated");
+      onSaved();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not upload the advert image."),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => remove({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Advert removed");
+      onSaved();
+    },
+    onError: () => toast.error("Could not remove the advert."),
+  });
+
+  return (
+    <Card
+      title="Advert gallery"
+      description="Publish promotions and updates. Optional start and end times use the time on your device."
+    >
+      <ul className="space-y-3">
+        {gallery.map((item) => (
+          <li key={item.id} className="rounded-xl border border-border p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {item.imageUrl ? (
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  className="h-16 w-24 rounded-lg object-cover"
+                />
+              ) : (
+                <span className="grid h-16 w-24 place-items-center rounded-lg bg-secondary text-xs">
+                  No image
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold">{item.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  sort {item.sortOrder} · {item.active ? "Active" : "Hidden"}
+                </p>
+              </div>
+              <button
+                type="button"
+                className={ghost}
+                onClick={() =>
+                  saveMutation.mutate({
+                    id: item.id,
+                    title: item.title,
+                    caption: item.caption,
+                    linkUrl: item.linkUrl,
+                    active: !item.active,
+                    sortOrder: item.sortOrder,
+                    startsAt: toLocalDateTime(item.startsAt),
+                    endsAt: toLocalDateTime(item.endsAt),
+                  })
+                }
+              >
+                {item.active ? "Hide" : "Show"}
+              </button>
+              <button
+                type="button"
+                className={ghost}
+                onClick={() =>
+                  setDraft({
+                    id: item.id,
+                    title: item.title,
+                    caption: item.caption,
+                    linkUrl: item.linkUrl,
+                    active: item.active,
+                    sortOrder: item.sortOrder,
+                    startsAt: toLocalDateTime(item.startsAt),
+                    endsAt: toLocalDateTime(item.endsAt),
+                  })
+                }
+              >
+                Edit
+              </button>
+              <label className={`${ghost} cursor-pointer`}>
+                Image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) imageMutation.mutate({ id: item.id, file });
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className={ghost}
+                onClick={() => removeMutation.mutate(item.id)}
+              >
+                Remove
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-5 rounded-xl border border-dashed border-border p-4">
+        <h3 className="font-semibold">{draft.id ? "Edit advert" : "Add advert"}</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className={label}>
+            Title
+            <input
+              className={`${input} mt-1`}
+              value={draft.title}
+              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Button link (optional)
+            <input
+              className={`${input} mt-1`}
+              value={draft.linkUrl}
+              placeholder="https://… or /checkout"
+              onChange={(event) => setDraft({ ...draft, linkUrl: event.target.value })}
+            />
+          </label>
+          <label className={`${label} sm:col-span-2`}>
+            Caption
+            <input
+              className={`${input} mt-1`}
+              value={draft.caption}
+              onChange={(event) => setDraft({ ...draft, caption: event.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Show from (optional)
+            <input
+              type="datetime-local"
+              className={`${input} mt-1`}
+              value={draft.startsAt}
+              onChange={(event) => setDraft({ ...draft, startsAt: event.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Hide after (optional)
+            <input
+              type="datetime-local"
+              className={`${input} mt-1`}
+              value={draft.endsAt}
+              onChange={(event) => setDraft({ ...draft, endsAt: event.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Sort order
+            <input
+              type="number"
+              min="0"
+              className={`${input} mt-1`}
+              value={draft.sortOrder}
+              onChange={(event) => setDraft({ ...draft, sortOrder: Number(event.target.value) })}
+            />
+          </label>
+          <Toggle
+            label="Visible"
+            checked={draft.active}
+            onChange={(active) => setDraft({ ...draft, active })}
+          />
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            className={button}
+            disabled={saveMutation.isPending || draft.title.trim() === ""}
+            onClick={() => saveMutation.mutate(draft)}
+          >
+            {draft.id ? "Save changes" : "Add advert"}
+          </button>
+          {draft.id ? (
+            <button type="button" className={ghost} onClick={() => setDraft(emptyGalleryItem)}>
+              Cancel
+            </button>
+          ) : null}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Save the advert first, then use its Image button above to upload artwork. Landscape images
+          around 1200 × 800 work best.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
 function LocationsSection({
   locations,
   onSaved,
@@ -551,15 +818,24 @@ function LocationsSection({
   onSaved: () => void;
 }) {
   const save = useServerFn(saveLocation);
-  const [draft, setDraft] = useState<{ id?: string; name: string; active: boolean; sortOrder: number }>({
+  const [draft, setDraft] = useState<{
+    id?: string;
+    name: string;
+    active: boolean;
+    sortOrder: number;
+  }>({
     name: "",
     active: true,
     sortOrder: 0,
   });
 
   const mutation = useMutation({
-    mutationFn: async (payload: { id?: string; name: string; active: boolean; sortOrder: number }) =>
-      save({ data: payload }),
+    mutationFn: async (payload: {
+      id?: string;
+      name: string;
+      active: boolean;
+      sortOrder: number;
+    }) => save({ data: payload }),
     onSuccess: () => {
       toast.success("Delivery location saved");
       setDraft({ name: "", active: true, sortOrder: 0 });
@@ -628,11 +904,11 @@ function WindowsSection({ windows, onSaved }: { windows: AdminWindow[]; onSaved:
   const save = useServerFn(saveWindow);
   const saveException = useServerFn(saveWindowException);
   const removeException = useServerFn(deleteWindowException);
-  const [draft, setDraft] = useState<(typeof emptyWindow) & { id?: string }>(emptyWindow);
+  const [draft, setDraft] = useState<typeof emptyWindow & { id?: string }>(emptyWindow);
   const [exceptionDate, setExceptionDate] = useState<Record<string, string>>({});
 
   const mutation = useMutation({
-    mutationFn: async (payload: (typeof emptyWindow) & { id?: string }) => save({ data: payload }),
+    mutationFn: async (payload: typeof emptyWindow & { id?: string }) => save({ data: payload }),
     onSuccess: () => {
       toast.success("Delivery period saved");
       setDraft(emptyWindow);
@@ -642,10 +918,10 @@ function WindowsSection({ windows, onSaved }: { windows: AdminWindow[]; onSaved:
   });
 
   const exceptionMutation = useMutation({
-    mutationFn: async (payload: { windowId: string; date: string }) =>
-      saveException({ data: { ...payload, available: false, note: "" } }),
-    onSuccess: () => {
-      toast.success("Date marked unavailable");
+    mutationFn: async (payload: { windowId: string; date: string; available: boolean }) =>
+      saveException({ data: { ...payload, note: "" } }),
+    onSuccess: (_result, payload) => {
+      toast.success(payload.available ? "Delivery period opened" : "Delivery period closed");
       onSaved();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Could not save the date."),
@@ -663,7 +939,7 @@ function WindowsSection({ windows, onSaved }: { windows: AdminWindow[]; onSaved:
   return (
     <Card
       title="Delivery periods"
-      description="Set the daily windows and block specific dates when you can't deliver."
+      description="Automatic cutoffs use Ghana time (GMT). Manual open/close overrides always win for the delivery date shown."
     >
       <ul className="space-y-3">
         {windows.map((window) => (
@@ -673,12 +949,28 @@ function WindowsSection({ windows, onSaved }: { windows: AdminWindow[]; onSaved:
               <span className="text-sm text-muted-foreground">
                 {window.startTime}–{window.endTime} · sort {window.sortOrder}
               </span>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  window.effectiveAvailable
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                }`}
+              >
+                {window.effectiveAvailable ? "Open" : "Closed"} for {window.deliveryDate}
+                {window.manualOverride !== null ? " · manual" : " · automatic"}
+              </span>
               <button
                 type="button"
                 className={ghost}
                 onClick={() => {
-                  const { exceptions: _ex, ...rest } = window;
-                  mutation.mutate({ ...rest, active: !window.active });
+                  mutation.mutate({
+                    id: window.id,
+                    label: window.label,
+                    startTime: window.startTime,
+                    endTime: window.endTime,
+                    active: !window.active,
+                    sortOrder: window.sortOrder,
+                  });
                 }}
               >
                 {window.active ? "Disable" : "Enable"}
@@ -687,15 +979,52 @@ function WindowsSection({ windows, onSaved }: { windows: AdminWindow[]; onSaved:
                 type="button"
                 className={ghost}
                 onClick={() => {
-                  const { exceptions: _ex, ...rest } = window;
-                  setDraft(rest);
+                  setDraft({
+                    id: window.id,
+                    label: window.label,
+                    startTime: window.startTime,
+                    endTime: window.endTime,
+                    active: window.active,
+                    sortOrder: window.sortOrder,
+                  });
                 }}
               >
                 Edit
               </button>
             </div>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,200px)_auto]">
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={button}
+                disabled={exceptionMutation.isPending || !window.active}
+                onClick={() =>
+                  exceptionMutation.mutate({
+                    windowId: window.id,
+                    date: window.deliveryDate,
+                    available: true,
+                  })
+                }
+              >
+                Open now
+              </button>
+              <button
+                type="button"
+                className={ghost}
+                disabled={exceptionMutation.isPending}
+                onClick={() =>
+                  exceptionMutation.mutate({
+                    windowId: window.id,
+                    date: window.deliveryDate,
+                    available: false,
+                  })
+                }
+              >
+                Close now
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,200px)_auto_auto]">
               <input
                 type="date"
                 className={input}
@@ -712,6 +1041,21 @@ function WindowsSection({ windows, onSaved }: { windows: AdminWindow[]; onSaved:
                   exceptionMutation.mutate({
                     windowId: window.id,
                     date: exceptionDate[window.id] as string,
+                    available: true,
+                  })
+                }
+              >
+                Mark available
+              </button>
+              <button
+                type="button"
+                className={ghost}
+                disabled={!exceptionDate[window.id]}
+                onClick={() =>
+                  exceptionMutation.mutate({
+                    windowId: window.id,
+                    date: exceptionDate[window.id] as string,
+                    available: false,
                   })
                 }
               >

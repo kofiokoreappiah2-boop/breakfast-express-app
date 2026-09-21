@@ -3,7 +3,6 @@ import { z } from "zod";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import { buildOrderNotification } from "@/lib/notification";
 import { money } from "@/lib/format";
-import { getGhanaClock, isBeforeDeliveryCutoff } from "@/lib/delivery-time";
 
 const orderSchema = z.object({
   customerName: z.string().trim().min(2, "Name is too short").max(100),
@@ -47,6 +46,7 @@ export const createOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { getRequestHeader } = await import("@tanstack/react-start/server");
+    const { getDeliverySchedule } = await import("@/lib/delivery-schedule");
 
     // --- Same attempt already placed? Return it instead of ordering twice ----
     if (data.clientRequestId) {
@@ -130,7 +130,6 @@ export const createOrder = createServerFn({ method: "POST" })
     }
 
     // --- Delivery location / window must currently be active -----------------
-    const { date: today, time: currentTime } = getGhanaClock();
     const [locationRes, windowRes] = await Promise.all([
       supabaseAdmin
         .from("delivery_locations")
@@ -152,21 +151,18 @@ export const createOrder = createServerFn({ method: "POST" })
     if (!windowRes.data) {
       throw new Error("That delivery period isn't available. Please choose another one.");
     }
-    if (!isBeforeDeliveryCutoff(windowRes.data.start_time, currentTime)) {
-      throw new Error(
-        "That delivery period's ordering cutoff has passed. Please choose another one.",
-      );
-    }
+    const schedule = getDeliverySchedule(windowRes.data.start_time);
 
     const { data: exception } = await supabaseAdmin
       .from("delivery_window_exceptions")
       .select("available")
       .eq("window_id", windowRes.data.id)
-      .eq("exception_date", today)
+      .eq("exception_date", schedule.deliveryDate)
       .maybeSingle();
 
-    if (exception && !exception.available) {
-      throw new Error("That delivery period isn't available today. Please choose another one.");
+    const windowAvailable = exception ? exception.available : schedule.automaticallyAvailable;
+    if (!windowAvailable) {
+      throw new Error("That delivery period has closed. Please choose another one.");
     }
 
     // --- Pricing (always from the database) ----------------------------------
@@ -205,7 +201,7 @@ export const createOrder = createServerFn({ method: "POST" })
         customer_phone: data.customerPhone,
         delivery_location: data.deliveryLocation,
         delivery_window: data.deliveryWindow,
-        delivery_date: today,
+        delivery_date: schedule.deliveryDate,
         payment_method: data.paymentMethod,
         additional_instructions: data.additionalInstructions ?? "",
         client_request_id: data.clientRequestId ?? null,
@@ -255,6 +251,8 @@ export const createOrder = createServerFn({ method: "POST" })
       deliveryWindow: data.deliveryWindow,
       paymentMethod: data.paymentMethod,
       paymentStatus: order.payment_status as string,
+      momoNumber: settings?.momo_number ?? "059847399",
+      momoAccountName: settings?.momo_account_name ?? "Appiah Kofi Okore",
       additionalInstructions: order.additional_instructions ?? "",
       total: Number(order.total),
       subtotal: Number(order.subtotal),

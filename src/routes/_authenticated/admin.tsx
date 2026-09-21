@@ -25,10 +25,10 @@ import {
   describeRange,
   filterOrders,
   summarise,
+  summariseItems,
   type OrderFilters,
   type ReportOrder,
 } from "@/lib/order-report";
-
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -134,13 +134,17 @@ function AdminPage() {
     onError: () => toast.error("Could not update the payment status."),
   });
 
-  const orders = ordersQuery.data ?? [];
+  const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
 
   const filtered = useMemo(
     () => filterOrders(orders as unknown as ReportOrder[], filters) as unknown as OrderRow[],
     [orders, filters],
   );
   const summary = useMemo(() => summarise(filtered as unknown as ReportOrder[]), [filtered]);
+  const itemSummary = useMemo(
+    () => summariseItems(filtered as unknown as ReportOrder[]),
+    [filtered],
+  );
   const totalSales = summary.totalSales;
 
   const locationOptions = useMemo(
@@ -157,7 +161,11 @@ function AdminPage() {
       toast.error("No orders match these filters.");
       return;
     }
-    const html = buildPrintHtml(filtered as unknown as ReportOrder[], BUSINESS.name, describeRange(filters));
+    const html = buildPrintHtml(
+      filtered as unknown as ReportOrder[],
+      BUSINESS.name,
+      describeRange(filters),
+    );
     const win = window.open("", "_blank", "noopener,noreferrer,width=1000,height=800");
     if (!win) {
       toast.error("Please allow pop-ups to print the delivery sheet.");
@@ -182,7 +190,6 @@ function AdminPage() {
     link.click();
     URL.revokeObjectURL(url);
   }
-
 
   async function signOut() {
     await queryClient.cancelQueries();
@@ -212,9 +219,7 @@ function AdminPage() {
               toast.success("You are now the owner.");
               void rolesQuery.refetch();
             } catch (error) {
-              toast.error(
-                error instanceof Error ? error.message : "Could not grant owner access.",
-              );
+              toast.error(error instanceof Error ? error.message : "Could not grant owner access.");
             }
           }}
           className="mt-6 h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground"
@@ -238,9 +243,7 @@ function AdminPage() {
       <header className="border-b border-border bg-card">
         <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-4">
           <div className="min-w-0">
-            <h1 className="truncate font-display text-xl font-bold sm:text-2xl">
-              Order dashboard
-            </h1>
+            <h1 className="truncate font-display text-xl font-bold sm:text-2xl">Order dashboard</h1>
             <Link to="/" className="text-xs text-muted-foreground underline">
               Back to {BUSINESS.name} store
             </Link>
@@ -468,11 +471,30 @@ function AdminPage() {
 
           <p className="text-sm text-muted-foreground">
             {summary.count} order(s) · sales {formatCedis(summary.totalSales)} · paid{" "}
-            {summary.paidCount} ({formatCedis(summary.paidTotal)}) · pending{" "}
-            {summary.pendingCount} ({formatCedis(summary.pendingTotal)})
+            {summary.paidCount} ({formatCedis(summary.paidTotal)}) · pending {summary.pendingCount}{" "}
+            ({formatCedis(summary.pendingTotal)})
           </p>
-        </div>
 
+          <div className="rounded-xl border border-border bg-secondary/40 p-4">
+            <h3 className="font-display text-base font-bold">Items in these orders</h3>
+            {itemSummary.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                No items match the current filters.
+              </p>
+            ) : (
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {itemSummary.map((item) => (
+                  <li
+                    key={item.name}
+                    className="rounded-full bg-card px-3 py-1.5 text-sm font-semibold shadow-sm"
+                  >
+                    {item.name} × {item.quantity}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
 
         {ordersQuery.isLoading ? (
           <p className="mt-8 text-center text-muted-foreground">Loading orders…</p>
@@ -514,7 +536,6 @@ function AdminPage() {
                       updatePayment.mutate({ id: order.id, paymentStatus })
                     }
                   />
-
                 </li>
               ))}
             </ul>
@@ -542,9 +563,7 @@ function AdminPage() {
                           <button
                             type="button"
                             className="font-semibold underline"
-                            onClick={() =>
-                              setExpanded(expanded === order.id ? null : order.id)
-                            }
+                            onClick={() => setExpanded(expanded === order.id ? null : order.id)}
                           >
                             #{order.order_number}
                           </button>
