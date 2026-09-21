@@ -251,7 +251,7 @@ export const createOrder = createServerFn({ method: "POST" })
       deliveryWindow: data.deliveryWindow,
       paymentMethod: data.paymentMethod,
       paymentStatus: order.payment_status as string,
-      momoNumber: settings?.momo_number ?? "059847399",
+      momoNumber: settings?.momo_number ?? "0598473399",
       momoAccountName: settings?.momo_account_name ?? "Appiah Kofi Okore",
       additionalInstructions: order.additional_instructions ?? "",
       total: Number(order.total),

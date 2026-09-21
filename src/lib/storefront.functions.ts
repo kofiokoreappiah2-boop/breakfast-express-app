@@ -115,7 +115,7 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
         contactPhone: s?.contact_phone ?? "0555992497",
         whatsappNumber: s?.whatsapp_number ?? "233555992497",
         momoEnabled: s?.momo_enabled ?? true,
-        momoNumber: s?.momo_number ?? "059847399",
+        momoNumber: s?.momo_number ?? "0598473399",
         momoAccountName: s?.momo_account_name ?? "Appiah Kofi Okore",
         podEnabled: s?.pod_enabled ?? true,
         heroImageUrl: heroPath ? (signed[heroPath] ?? null) : null,

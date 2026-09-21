@@ -5,7 +5,7 @@ export const BUSINESS = {
   subTagline: "Your neighbourhood breakfast, made easy.",
   phone: "0555992497",
   whatsappUrl: "https://wa.me/233555992497",
-  momoNumber: "059847399",
+  momoNumber: "0598473399",
   momoAccountName: "Appiah Kofi Okore",
 } as const;
 

@@ -130,7 +130,7 @@ Payment on Delivery
 
 For Mobile Money display:
 
-MoMo Number: 0598473398
+MoMo Number: 0598473399
 Account Name: Appiah Kofi Okore
 
 For Version 1, do NOT attempt to automatically process the MoMo transaction. Simply display the payment details and allow the customer to select Mobile Money as their payment method.
