@@ -102,7 +102,7 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
       supabaseAdmin
         .from("promotions")
         .select(
-          "code, title, discount_amount, redemption_limit, redemptions_count, active, starts_at, ends_at",
+          "code, title, discount_amount, redemption_limit, redemptions_count, active, starts_at, ends_at, display_ends_at",
         )
         .eq("code", "FOUNDERS_DAY_2026")
         .maybeSingle(),
@@ -124,8 +124,11 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
     const promo = promotionRes.data;
     const promoStarted = !promo?.starts_at || new Date(promo.starts_at).getTime() <= now;
     const promoNotEnded = !promo?.ends_at || new Date(promo.ends_at).getTime() > now;
+    const promoDisplayNotEnded = promo?.display_ends_at
+      ? new Date(promo.display_ends_at).getTime() > now
+      : promoNotEnded;
     const promoFullyClaimed = promo ? promo.redemptions_count >= promo.redemption_limit : false;
-    const promotionVisible = !!promo && promo.active && promoNotEnded;
+    const promotionVisible = !!promo && promo.active && promoDisplayNotEnded;
 
     const windows = (windowsRes.data ?? []).filter((window) => {
       const schedule = getDeliverySchedule(window.start_time);

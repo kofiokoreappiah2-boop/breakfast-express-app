@@ -448,6 +448,7 @@ export type Database = {
           code: string;
           created_at: string;
           discount_amount: number;
+          display_ends_at: string | null;
           ends_at: string | null;
           redemption_limit: number;
           redemptions_count: number;
@@ -460,6 +461,7 @@ export type Database = {
           code: string;
           created_at?: string;
           discount_amount: number;
+          display_ends_at?: string | null;
           ends_at?: string | null;
           redemption_limit: number;
           redemptions_count?: number;
@@ -472,6 +474,7 @@ export type Database = {
           code?: string;
           created_at?: string;
           discount_amount?: number;
+          display_ends_at?: string | null;
           ends_at?: string | null;
           redemption_limit?: number;
           redemptions_count?: number;
