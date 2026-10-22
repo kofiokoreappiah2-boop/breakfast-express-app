@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { MaintenancePage, MaintenancePageLoading } from "@/components/MaintenancePage";
 import { useCart } from "@/lib/cart";
 import { formatCedis } from "@/lib/format";
 import { BUSINESS, PAYMENT_METHODS, type PaymentMethod } from "@/lib/constants";
@@ -36,14 +37,13 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const { items, subtotal, clearCart } = useCart();
   const submitOrder = useServerFn(createOrder);
-  const { data: storefront } = useStorefront();
+  const { data: storefront, isLoading } = useStorefront();
   const settings = storefront?.settings;
   const locations = storefront?.locations ?? [];
   const windows = storefront?.windows ?? [];
   const paymentMethods: PaymentMethod[] = PAYMENT_METHODS.filter((method) =>
     method === "Mobile Money" ? (settings?.momoEnabled ?? true) : (settings?.podEnabled ?? true),
   );
-  const acceptingOrders = settings?.acceptingOrders ?? true;
   const promotion = storefront?.promotion;
   const estimatedDiscount =
     promotion?.available && promotion.remaining > 0
@@ -63,6 +63,9 @@ function CheckoutPage() {
   // order instead of creating a new one.
   const requestIdRef = useRef<string | null>(null);
   const inFlightRef = useRef(false);
+
+  if (isLoading) return <MaintenancePageLoading />;
+  if (settings && !settings.acceptingOrders) return <MaintenancePage settings={settings} />;
 
   function validate(): boolean {
     const next: Errors = {};
@@ -125,20 +128,7 @@ function CheckoutPage() {
       <main className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="font-display text-3xl font-bold">Checkout</h1>
 
-        {!acceptingOrders ? (
-          <div className="surface-card mt-6 p-8 text-center">
-            <p className="font-semibold">
-              {settings?.closedMessage ??
-                "We're currently not accepting orders. Please check back later."}
-            </p>
-            <Link
-              to="/"
-              className="mt-5 inline-flex h-12 items-center rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground"
-            >
-              Back to menu
-            </Link>
-          </div>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="surface-card mt-6 p-8 text-center">
             <p className="font-medium">You need at least one item to check out.</p>
             <Link

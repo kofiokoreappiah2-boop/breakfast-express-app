@@ -4,6 +4,7 @@ import { ImageOff, Trash2 } from "lucide-react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { QuantityStepper } from "@/components/QuantityStepper";
+import { MaintenancePage, MaintenancePageLoading } from "@/components/MaintenancePage";
 import { useCart } from "@/lib/cart";
 import { formatCedis } from "@/lib/format";
 import { useStorefront } from "@/lib/use-storefront";
@@ -22,13 +23,18 @@ export const Route = createFileRoute("/cart")({
 
 function CartPage() {
   const { items, subtotal, setQuantity, removeItem } = useCart();
-  const { data: storefront } = useStorefront();
+  const { data: storefront, isLoading } = useStorefront();
   const promotion = storefront?.promotion;
   const estimatedDiscount =
     promotion?.available && promotion.remaining > 0
       ? Math.min(promotion.discountAmount, subtotal)
       : 0;
   const estimatedTotal = subtotal - estimatedDiscount;
+
+  if (isLoading) return <MaintenancePageLoading />;
+  if (storefront?.settings && !storefront.settings.acceptingOrders) {
+    return <MaintenancePage settings={storefront.settings} />;
+  }
 
   return (
     <div className="min-h-screen">

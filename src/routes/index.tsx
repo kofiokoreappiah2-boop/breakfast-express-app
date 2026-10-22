@@ -5,6 +5,7 @@ import { Clock, ExternalLink, ImageOff, MapPin, Phone, ShoppingBag } from "lucid
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ProductCard } from "@/components/ProductCard";
+import { MaintenancePage, MaintenancePageLoading } from "@/components/MaintenancePage";
 import { BUSINESS } from "@/lib/constants";
 import { useCart } from "@/lib/cart";
 import { formatCedis } from "@/lib/format";
@@ -13,16 +14,15 @@ import { useStorefront } from "@/lib/use-storefront";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Einyornose — Fresh Breakfast Delivered to You" },
+      { title: "Einyornose — Website Renovation" },
       {
         name: "description",
-        content:
-          "Hausa porridge, puff puff, koose and more. Order breakfast on your phone and get it delivered to your hall in Ghana cedis.",
+        content: "Einyornose online ordering is temporarily paused while we renovate our website.",
       },
-      { property: "og:title", content: "Einyornose — Fresh Breakfast Delivered to You" },
+      { property: "og:title", content: "Einyornose — Website Renovation" },
       {
         property: "og:description",
-        content: "Your neighbourhood breakfast, made easy. Delivered to your hall.",
+        content: "We are preparing a refreshed Einyornose experience. We will be back soon.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -82,6 +82,9 @@ function HomePage() {
     ? `https://wa.me/${settings.whatsappNumber.replace(/\D/g, "")}`
     : BUSINESS.whatsappUrl;
 
+  if (isLoading) return <MaintenancePageLoading />;
+  if (settings && !settings.acceptingOrders) return <MaintenancePage settings={settings} />;
+
   return (
     <div className="min-h-screen pb-24">
       <SiteHeader />
@@ -89,12 +92,6 @@ function HomePage() {
       {settings?.promoEnabled && settings.promoMessage ? (
         <p className="warm-gradient px-4 py-2 text-center text-sm font-semibold text-primary-foreground">
           {settings.promoMessage}
-        </p>
-      ) : null}
-
-      {settings && !settings.acceptingOrders ? (
-        <p className="border-b border-border bg-secondary px-4 py-3 text-center text-sm font-semibold">
-          {settings.closedMessage}
         </p>
       ) : null}
 
