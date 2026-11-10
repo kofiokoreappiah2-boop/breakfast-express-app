@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Clock, ExternalLink, ImageOff, MapPin, Phone, ShoppingBag } from "lucide-react";
+import { Clock, ExternalLink, ImageOff, MapPin, Phone, ShoppingBag, Sparkles } from "lucide-react";
 
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -14,15 +14,15 @@ import { useStorefront } from "@/lib/use-storefront";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Einyornose — Website Renovation" },
+      { title: "Einyornose — Fresh breakfast, delivered" },
       {
         name: "description",
-        content: "Einyornose online ordering is temporarily paused while we renovate our website.",
+        content: "Order fresh Einyornose breakfast for delivery on campus.",
       },
-      { property: "og:title", content: "Einyornose — Website Renovation" },
+      { property: "og:title", content: "Einyornose — Breakfast is back" },
       {
         property: "og:description",
-        content: "We are preparing a refreshed Einyornose experience. We will be back soon.",
+        content: "Breakfast ordering is open. A new Einyornose experience arrives Saturday at 6 PM.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -37,7 +37,8 @@ const STEPS = [
   { title: "Eat well", body: "Pay by MoMo or on delivery. We bring it hot and fresh." },
 ];
 
-const RENOVATION_MODE = true;
+const RENOVATION_MODE = false;
+const BRAND_LAUNCH_AT = "2026-11-14T18:00:00Z";
 
 function PromotionCountdown({ startsAt }: { startsAt: string }) {
   const [remaining, setRemaining] = useState(() =>
@@ -68,6 +69,48 @@ function PromotionCountdown({ startsAt }: { startsAt: string }) {
   return <span>Offer begins in {time}</span>;
 }
 
+function BrandLaunchCountdown() {
+  const calculateRemaining = () => Math.max(0, new Date(BRAND_LAUNCH_AT).getTime() - Date.now());
+  const [remaining, setRemaining] = useState(calculateRemaining);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setRemaining(calculateRemaining()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (remaining === 0) return null;
+
+  const totalSeconds = Math.ceil(remaining / 1_000);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+  const units = [
+    { value: days, label: "days" },
+    { value: hours, label: "hrs" },
+    { value: minutes, label: "min" },
+    { value: seconds, label: "sec" },
+  ];
+
+  return (
+    <section className="border-b border-primary/20 bg-primary px-4 py-3 text-primary-foreground">
+      <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-2 text-center sm:flex-row sm:gap-4">
+        <span className="inline-flex items-center gap-2 text-sm font-bold">
+          <Sparkles className="h-4 w-4" aria-hidden="true" />
+          Something new arrives Saturday at 6 PM
+        </span>
+        <span className="flex items-center gap-2" aria-label="Countdown to the Einyornose brand launch">
+          {units.map((unit) => (
+            <span key={unit.label} className="rounded-lg bg-primary-foreground/15 px-2 py-1 text-xs font-semibold tabular-nums">
+              {String(unit.value).padStart(2, "0")} {unit.label}
+            </span>
+          ))}
+        </span>
+      </div>
+    </section>
+  );
+}
+
 function HomePage() {
   const { itemCount, total } = useCart();
   const { data, isLoading } = useStorefront();
@@ -92,6 +135,7 @@ function HomePage() {
   return (
     <div className="min-h-screen pb-24">
       <SiteHeader />
+      <BrandLaunchCountdown />
 
       {settings?.promoEnabled && settings.promoMessage ? (
         <p className="warm-gradient px-4 py-2 text-center text-sm font-semibold text-primary-foreground">
