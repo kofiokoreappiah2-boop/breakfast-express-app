@@ -171,7 +171,7 @@ function HomePage() {
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-primary">
               {businessName}
             </p>
-            <h1 className="mt-2 max-w-3xl font-display text-4xl font-bold leading-tight sm:text-6xl">
+            <h1 className="mt-2 max-w-3xl font-sans text-4xl font-black leading-[0.98] tracking-[-0.04em] sm:text-6xl">
               Breakfast for busy mornings.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-lg sm:leading-7">
