@@ -31,7 +31,7 @@ export const listStaff = createServerFn({ method: "GET" })
 /** Owner: invite someone by email and grant them a role. */
 export const inviteStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => inviteStaffSchema.parse(data))
+  .validator((data: unknown) => inviteStaffSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertOwner } = await import("@/lib/control-center.server");
     await assertOwner(context);
@@ -58,7 +58,7 @@ export const inviteStaff = createServerFn({ method: "POST" })
 /** Owner: change a person's role or switch their access on and off. */
 export const updateStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => staffUpdateSchema.parse(data))
+  .validator((data: unknown) => staffUpdateSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertOwner } = await import("@/lib/control-center.server");
     await assertOwner(context);

@@ -42,7 +42,7 @@ const IP_LIMIT_10_MIN = 40;
 const IP_LIMIT_HOUR = 120;
 
 export const createOrder = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => orderSchema.parse(data))
+  .validator((data: unknown) => orderSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { getRequestHeader } = await import("@tanstack/react-start/server");

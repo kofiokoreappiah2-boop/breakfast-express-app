@@ -192,7 +192,7 @@ export const getControlCenter = createServerFn({ method: "GET" })
 
 export const saveBusinessSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => settingsSchema.parse(data))
+  .validator((data: unknown) => settingsSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -225,7 +225,7 @@ export const saveBusinessSettings = createServerFn({ method: "POST" })
 
 export const saveProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => productSchema.parse(data))
+  .validator((data: unknown) => productSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -251,7 +251,7 @@ export const saveProduct = createServerFn({ method: "POST" })
 
 export const deleteProduct = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -269,7 +269,7 @@ export const deleteProduct = createServerFn({ method: "POST" })
 
 export const uploadImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => imageUploadSchema.parse(data))
+  .validator((data: unknown) => imageUploadSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin, storeImage, removeImage } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -326,7 +326,7 @@ export const uploadImage = createServerFn({ method: "POST" })
 
 export const saveGalleryItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => galleryItemSchema.parse(data))
+  .validator((data: unknown) => galleryItemSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -352,7 +352,7 @@ export const saveGalleryItem = createServerFn({ method: "POST" })
 
 export const deleteGalleryItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin, removeImage } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -370,7 +370,7 @@ export const deleteGalleryItem = createServerFn({ method: "POST" })
 
 export const addPromotionExclusion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => promotionExclusionSchema.parse(data))
+  .validator((data: unknown) => promotionExclusionSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -389,7 +389,7 @@ export const addPromotionExclusion = createServerFn({ method: "POST" })
 
 export const deletePromotionExclusion = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => promotionExclusionSchema.parse(data))
+  .validator((data: unknown) => promotionExclusionSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -406,7 +406,7 @@ export const deletePromotionExclusion = createServerFn({ method: "POST" })
 
 export const saveLocation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => locationSchema.parse(data))
+  .validator((data: unknown) => locationSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -427,7 +427,7 @@ export const saveLocation = createServerFn({ method: "POST" })
 
 export const saveWindow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => windowSchema.parse(data))
+  .validator((data: unknown) => windowSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -450,7 +450,7 @@ export const saveWindow = createServerFn({ method: "POST" })
 
 export const saveWindowException = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => windowExceptionSchema.parse(data))
+  .validator((data: unknown) => windowExceptionSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -471,7 +471,7 @@ export const saveWindowException = createServerFn({ method: "POST" })
 
 export const deleteWindowException = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { assertAdmin } = await import("@/lib/control-center.server");
     await assertAdmin(context);
@@ -487,7 +487,7 @@ export const deleteWindowException = createServerFn({ method: "POST" })
 /** Admin: change history for one order. */
 export const getOrderHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => idSchema.parse(data))
+  .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data, context }): Promise<AuditEntry[]> => {
     const { assertStaff } = await import("@/lib/control-center.server");
     await assertStaff(context);
