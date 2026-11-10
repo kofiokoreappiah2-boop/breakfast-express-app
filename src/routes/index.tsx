@@ -14,15 +14,17 @@ import { useStorefront } from "@/lib/use-storefront";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Einyornose — Fresh breakfast, delivered" },
+      { title: "Einyornose — Breakfast delivery for busy mornings" },
       {
         name: "description",
-        content: "Order fresh Einyornose breakfast for delivery on campus.",
+        content:
+          "Order convenient breakfast delivery from Einyornose and start your busy morning without the hassle.",
       },
-      { property: "og:title", content: "Einyornose — Breakfast is back" },
+      { property: "og:title", content: "Einyornose — Breakfast for busy mornings" },
       {
         property: "og:description",
-        content: "Breakfast ordering is open. A new Einyornose experience arrives Saturday at 6 PM.",
+        content:
+          "Your mornings are busy enough. Einyornose brings breakfast right to you, so you can start your day without the hassle.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -34,7 +36,7 @@ export const Route = createFileRoute("/")({
 const STEPS = [
   { title: "Pick your breakfast", body: "Choose your items and quantities from the menu." },
   { title: "Tell us where", body: "Select your hall and the delivery period that suits you." },
-  { title: "Eat well", body: "Pay by MoMo or on delivery. We bring it hot and fresh." },
+  { title: "Start your morning", body: "Pay by MoMo or on delivery. We bring it hot and fresh." },
 ];
 
 const RENOVATION_MODE = false;
@@ -99,9 +101,15 @@ function BrandLaunchCountdown() {
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           Something new arrives Saturday at 6 PM
         </span>
-        <span className="flex items-center gap-2" aria-label="Countdown to the Einyornose brand launch">
+        <span
+          className="flex items-center gap-2"
+          aria-label="Countdown to the Einyornose brand launch"
+        >
           {units.map((unit) => (
-            <span key={unit.label} className="rounded-lg bg-primary-foreground/15 px-2 py-1 text-xs font-semibold tabular-nums">
+            <span
+              key={unit.label}
+              className="rounded-lg bg-primary-foreground/15 px-2 py-1 text-xs font-semibold tabular-nums"
+            >
               {String(unit.value).padStart(2, "0")} {unit.label}
             </span>
           ))}
@@ -159,23 +167,46 @@ function HomePage() {
             <div className="warm-gradient h-72 w-full sm:h-96" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10" />
-          <div className="relative mx-auto -mt-28 max-w-5xl px-4 pb-8 sm:-mt-36">
-            <h1 className="font-display text-4xl font-bold leading-tight sm:text-6xl">
+          <div className="relative mx-auto -mt-36 max-w-5xl px-4 pb-8 sm:-mt-44">
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-primary">
               {businessName}
-            </h1>
-            <p className="mt-2 text-lg font-semibold text-primary sm:text-2xl">
-              {settings?.heroHeading ?? BUSINESS.tagline}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground sm:text-base">
-              {settings?.heroSubheading ?? BUSINESS.subTagline}
+            <h1 className="mt-2 max-w-3xl font-display text-4xl font-bold leading-tight sm:text-6xl">
+              Breakfast for busy mornings.
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-lg sm:leading-7">
+              Your mornings are busy enough. We bring breakfast right to you, so you can start your
+              day without the hassle.
+            </p>
+            <p className="mt-3 text-base font-semibold text-primary sm:text-lg">
+              Good food. Right where you are.
             </p>
             <a
               href="#menu"
               className="mt-5 inline-flex h-12 items-center justify-center rounded-xl bg-primary px-7 text-base font-semibold text-primary-foreground shadow-lift transition-transform active:scale-[0.98]"
             >
-              Order Now
+              Order Breakfast
             </a>
           </div>
+        </section>
+
+        <section
+          className="mx-auto max-w-5xl px-4 pb-4 pt-2 sm:pb-6 sm:pt-4"
+          aria-label="Breakfast deliveries resume Wednesday, 11 November 2026"
+        >
+          <a
+            href="#menu"
+            className="surface-card group block overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring"
+            aria-label="Pre-order breakfast now"
+          >
+            <img
+              src="/einyornose-breakfast-is-back.webp"
+              alt="Your Neighbourhood Breakfast is Back. Breakfast deliveries resume Wednesday, 11 November 2026. Pre-order now."
+              width={1536}
+              height={576}
+              className="h-auto w-full transition-transform duration-300 group-hover:scale-[1.01]"
+            />
+          </a>
         </section>
 
         {promotion ? (
@@ -234,7 +265,7 @@ function HomePage() {
         ) : null}
 
         <section id="menu" className="mx-auto max-w-5xl scroll-mt-20 px-4 py-6">
-          <h2 className="font-display text-2xl font-bold sm:text-3xl">This morning's menu</h2>
+          <h2 className="font-display text-2xl font-bold sm:text-3xl">Choose your breakfast</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Fresh every morning. Prices in Ghana cedis.
           </p>
