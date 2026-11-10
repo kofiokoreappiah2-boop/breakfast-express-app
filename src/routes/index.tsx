@@ -37,6 +37,8 @@ const STEPS = [
   { title: "Eat well", body: "Pay by MoMo or on delivery. We bring it hot and fresh." },
 ];
 
+const RENOVATION_MODE = true;
+
 function PromotionCountdown({ startsAt }: { startsAt: string }) {
   const [remaining, setRemaining] = useState(() =>
     Math.max(0, new Date(startsAt).getTime() - Date.now()),
@@ -69,6 +71,8 @@ function PromotionCountdown({ startsAt }: { startsAt: string }) {
 function HomePage() {
   const { itemCount, total } = useCart();
   const { data, isLoading } = useStorefront();
+
+  if (RENOVATION_MODE) return <MaintenancePage />;
 
   const settings = data?.settings;
   const products = data?.products ?? [];
