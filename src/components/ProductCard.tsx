@@ -12,10 +12,17 @@ export type Product = {
   size: string | null;
   price: number;
   available: boolean;
+  kind?: "item" | "combo";
   imageUrl?: string | null;
 };
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({
+  product,
+  orderingOpen = true,
+}: {
+  product: Product;
+  orderingOpen?: boolean;
+}) {
   const [quantity, setQuantity] = useState(1);
   const { addItem } = useCart();
   const label = product.size ? `${product.name} — ${product.size}` : product.name;
@@ -31,6 +38,15 @@ export function ProductCard({ product }: { product: Product }) {
           height={800}
           className="h-40 w-full object-cover sm:h-44"
         />
+      ) : product.kind === "combo" ? (
+        <div className="warm-gradient grid h-40 w-full place-items-center px-6 text-center text-primary-foreground sm:h-44">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-[0.18em] opacity-80">
+              Einyornose combo
+            </span>
+            <p className="mt-2 font-display text-2xl font-bold">{product.name}</p>
+          </div>
+        </div>
       ) : (
         <div className="grid h-40 w-full place-items-center bg-secondary text-muted-foreground sm:h-44">
           <ImageOff className="h-8 w-8" aria-hidden="true" />
@@ -56,8 +72,9 @@ export function ProductCard({ product }: { product: Product }) {
           <QuantityStepper value={quantity} onChange={setQuantity} label={label} />
           <button
             type="button"
-            disabled={!product.available}
+            disabled={!product.available || !orderingOpen}
             onClick={() => {
+              if (!orderingOpen) return;
               addItem(
                 {
                   productId: product.id,
@@ -72,7 +89,7 @@ export function ProductCard({ product }: { product: Product }) {
             }}
             className="h-11 flex-1 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-soft transition-transform hover:brightness-105 active:scale-[0.98] disabled:opacity-50"
           >
-            {product.available ? "Add to cart" : "Sold out"}
+            {!product.available ? "Sold out" : orderingOpen ? "Add to cart" : "Orders closed"}
           </button>
         </div>
       </div>

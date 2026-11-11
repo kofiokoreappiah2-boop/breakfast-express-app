@@ -25,7 +25,16 @@ export type StorefrontProduct = {
   size: string | null;
   price: number;
   available: boolean;
+  kind: "item" | "combo";
   imageUrl: string | null;
+};
+
+export type StorefrontOrdering = {
+  open: boolean;
+  deliveryDate: string;
+  windowLabel: string;
+  opensAt: string;
+  closesAt: string;
 };
 
 export type StorefrontGalleryItem = {
@@ -57,6 +66,7 @@ export type Storefront = {
   promotion: StorefrontPromotion | null;
   locations: string[];
   windows: string[];
+  ordering: StorefrontOrdering;
 };
 
 /** Public: everything the storefront needs, with short-lived image links. */
@@ -64,7 +74,7 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
   async (): Promise<Storefront> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { signImagePaths } = await import("@/lib/images.server");
-    const { getDeliverySchedule } = await import("@/lib/delivery-schedule");
+    const { getOrderSchedule } = await import("@/lib/delivery-schedule");
 
     const [
       settingsRes,
@@ -78,7 +88,7 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
       supabaseAdmin.from("business_settings").select("*").eq("id", true).maybeSingle(),
       supabaseAdmin
         .from("products")
-        .select("id, name, description, size, price, available, image_path, sort_order")
+        .select("id, name, description, size, price, available, image_path, sort_order, kind")
         .order("sort_order", { ascending: true }),
       supabaseAdmin
         .from("delivery_locations")
@@ -130,14 +140,14 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
     const promoFullyClaimed = promo ? promo.redemptions_count >= promo.redemption_limit : false;
     const promotionVisible = !!promo && promo.active && promoDisplayNotEnded;
 
+    const orderSchedule = getOrderSchedule();
     const windows = (windowsRes.data ?? []).filter((window) => {
-      const schedule = getDeliverySchedule(window.start_time);
       const exception = (exceptionsRes.data ?? []).find(
-        (row) => row.window_id === window.id && row.exception_date === schedule.deliveryDate,
+        (row) => row.window_id === window.id && row.exception_date === orderSchedule.deliveryDate,
       );
 
       // A date-specific exception is an explicit override in either direction.
-      return exception ? exception.available : schedule.automaticallyAvailable;
+      return exception ? exception.available : orderSchedule.orderingOpen;
     });
 
     return {
@@ -168,6 +178,7 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
           size: p.size,
           price: Number(p.price),
           available: p.available,
+          kind: p.kind === "combo" ? "combo" : "item",
           imageUrl: p.image_path ? (signed[p.image_path] ?? null) : null,
         })),
       gallery: (galleryRes.data ?? [])
@@ -200,6 +211,13 @@ export const getStorefront = createServerFn({ method: "GET" }).handler(
         : null,
       locations: (locationsRes.data ?? []).map((l) => l.name),
       windows: windows.map((window) => window.label),
+      ordering: {
+        open: orderSchedule.orderingOpen && windows.length > 0,
+        deliveryDate: orderSchedule.deliveryDate,
+        windowLabel: orderSchedule.windowLabel,
+        opensAt: orderSchedule.opensAt,
+        closesAt: orderSchedule.closesAt,
+      },
     };
   },
 );

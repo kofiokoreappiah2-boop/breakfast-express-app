@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Clock, ExternalLink, ImageOff, MapPin, Phone, ShoppingBag, Sparkles } from "lucide-react";
+import { Clock, ExternalLink, ImageOff, MapPin, Phone, ShoppingBag } from "lucide-react";
 
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -35,12 +35,14 @@ export const Route = createFileRoute("/")({
 
 const STEPS = [
   { title: "Pick your breakfast", body: "Choose your items and quantities from the menu." },
-  { title: "Tell us where", body: "Select your hall and the delivery period that suits you." },
+  {
+    title: "Tell us where",
+    body: "Select your delivery point. We deliver in one early-morning run.",
+  },
   { title: "Start your morning", body: "Pay by MoMo or on delivery. We bring it hot and fresh." },
 ];
 
 const RENOVATION_MODE = false;
-const BRAND_LAUNCH_AT = "2026-11-14T18:00:00Z";
 
 function PromotionCountdown({ startsAt }: { startsAt: string }) {
   const [remaining, setRemaining] = useState(() =>
@@ -71,54 +73,6 @@ function PromotionCountdown({ startsAt }: { startsAt: string }) {
   return <span>Offer begins in {time}</span>;
 }
 
-function BrandLaunchCountdown() {
-  const calculateRemaining = () => Math.max(0, new Date(BRAND_LAUNCH_AT).getTime() - Date.now());
-  const [remaining, setRemaining] = useState(calculateRemaining);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setRemaining(calculateRemaining()), 1_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  if (remaining === 0) return null;
-
-  const totalSeconds = Math.ceil(remaining / 1_000);
-  const days = Math.floor(totalSeconds / 86_400);
-  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
-  const minutes = Math.floor((totalSeconds % 3_600) / 60);
-  const seconds = totalSeconds % 60;
-  const units = [
-    { value: days, label: "days" },
-    { value: hours, label: "hrs" },
-    { value: minutes, label: "min" },
-    { value: seconds, label: "sec" },
-  ];
-
-  return (
-    <section className="border-b border-primary/20 bg-primary px-4 py-3 text-primary-foreground">
-      <div className="mx-auto flex max-w-5xl flex-col items-center justify-center gap-2 text-center sm:flex-row sm:gap-4">
-        <span className="inline-flex items-center gap-2 text-sm font-bold">
-          <Sparkles className="h-4 w-4" aria-hidden="true" />
-          Something new arrives Saturday at 6 PM
-        </span>
-        <span
-          className="flex items-center gap-2"
-          aria-label="Countdown to the Einyornose brand launch"
-        >
-          {units.map((unit) => (
-            <span
-              key={unit.label}
-              className="rounded-lg bg-primary-foreground/15 px-2 py-1 text-xs font-semibold tabular-nums"
-            >
-              {String(unit.value).padStart(2, "0")} {unit.label}
-            </span>
-          ))}
-        </span>
-      </div>
-    </section>
-  );
-}
-
 function HomePage() {
   const { itemCount, total } = useCart();
   const { data, isLoading } = useStorefront();
@@ -127,10 +81,13 @@ function HomePage() {
 
   const settings = data?.settings;
   const products = data?.products ?? [];
+  const combos = products.filter((product) => product.kind === "combo");
+  const individualItems = products.filter((product) => product.kind !== "combo");
   const gallery = data?.gallery ?? [];
   const promotion = data?.promotion ?? null;
   const locations = data?.locations ?? [];
   const windows = data?.windows ?? [];
+  const ordering = data?.ordering;
   const businessName = settings?.businessName ?? BUSINESS.name;
   const phone = settings?.contactPhone ?? BUSINESS.phone;
   const whatsappUrl = settings?.whatsappNumber
@@ -143,7 +100,6 @@ function HomePage() {
   return (
     <div className="min-h-screen pb-24">
       <SiteHeader />
-      <BrandLaunchCountdown />
 
       {settings?.promoEnabled && settings.promoMessage ? (
         <p className="warm-gradient px-4 py-2 text-center text-sm font-semibold text-primary-foreground">
@@ -190,24 +146,36 @@ function HomePage() {
           </div>
         </section>
 
-        <section
-          className="mx-auto max-w-5xl px-4 pb-4 pt-2 sm:pb-6 sm:pt-4"
-          aria-label="Breakfast deliveries resume Wednesday, 11 November 2026"
-        >
-          <a
-            href="#menu"
-            className="surface-card group block overflow-hidden focus:outline-none focus:ring-2 focus:ring-ring"
-            aria-label="Pre-order breakfast now"
-          >
-            <img
-              src="/einyornose-breakfast-is-back.webp"
-              alt="Your Neighbourhood Breakfast is Back. Breakfast deliveries resume Wednesday, 11 November 2026. Pre-order now."
-              width={1536}
-              height={576}
-              className="h-auto w-full transition-transform duration-300 group-hover:scale-[1.01]"
-            />
-          </a>
-        </section>
+        {ordering ? (
+          <section className="mx-auto max-w-5xl px-4 pb-4 pt-2 sm:pb-6 sm:pt-4">
+            <div
+              className={`surface-card flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center ${ordering.open ? "border-primary/30" : "border-accent/50"}`}
+            >
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">
+                  {ordering.open ? "Orders are open" : "Next morning run"}
+                </p>
+                <p className="mt-1 text-xl font-bold">
+                  {new Intl.DateTimeFormat("en-GH", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    timeZone: "Africa/Accra",
+                  }).format(new Date(`${ordering.deliveryDate}T12:00:00Z`))}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {ordering.windowLabel} · Sunday to Friday
+                </p>
+              </div>
+              <div className="rounded-xl bg-secondary px-4 py-3 text-sm">
+                <strong className="block">Orders close at 5:45 AM</strong>
+                <span className="text-muted-foreground">
+                  {ordering.open ? "Order now for this run." : "Ordering reopens at 5:00 PM."}
+                </span>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {promotion ? (
           <section className="mx-auto max-w-5xl px-4 py-4" aria-label="Founder's Day offer">
@@ -281,11 +249,37 @@ function HomePage() {
               No items are available right now. Please check back soon.
             </p>
           ) : (
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            <>
+              {combos.length > 0 ? (
+                <div className="mt-6">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <h3 className="text-xl font-bold">Ready-made combos</h3>
+                      <p className="text-sm text-muted-foreground">
+                        One tap, a complete morning order. Combo prices equal the individual items.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {combos.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        orderingOpen={ordering?.open}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <div className="mt-8">
+                <h3 className="text-xl font-bold">Build your own breakfast</h3>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {individualItems.map((product) => (
+                    <ProductCard key={product.id} product={product} orderingOpen={ordering?.open} />
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </section>
 
@@ -365,7 +359,7 @@ function HomePage() {
             </div>
             <div className="surface-card p-5">
               <h2 className="flex items-center gap-2 font-display text-xl font-bold">
-                <Clock className="h-5 w-5 text-primary" aria-hidden="true" /> Delivery periods
+                <Clock className="h-5 w-5 text-primary" aria-hidden="true" /> Morning delivery
               </h2>
               <ul className="mt-3 space-y-2 text-sm">
                 {windows.map((window) => (
@@ -374,6 +368,9 @@ function HomePage() {
                   </li>
                 ))}
               </ul>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Orders close at 5:45 AM. Saturday is our weekly rest day.
+              </p>
             </div>
           </div>
         </section>

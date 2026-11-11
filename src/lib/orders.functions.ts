@@ -46,7 +46,7 @@ export const createOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { getRequestHeader } = await import("@tanstack/react-start/server");
-    const { getDeliverySchedule } = await import("@/lib/delivery-schedule");
+    const { getOrderSchedule, DELIVERY_WINDOW_LABEL } = await import("@/lib/delivery-schedule");
 
     // --- Same attempt already placed? Return it instead of ordering twice ----
     if (data.clientRequestId) {
@@ -129,6 +129,14 @@ export const createOrder = createServerFn({ method: "POST" })
       );
     }
 
+    const schedule = getOrderSchedule();
+    if (!schedule.orderingOpen) {
+      throw new Error("Orders for this morning have closed. Ordering reopens at 5:00 PM.");
+    }
+    if (data.deliveryWindow !== DELIVERY_WINDOW_LABEL) {
+      throw new Error("Please refresh the checkout and use the current delivery run.");
+    }
+
     // --- Delivery location / window must currently be active -----------------
     const [locationRes, windowRes] = await Promise.all([
       supabaseAdmin
@@ -151,8 +159,6 @@ export const createOrder = createServerFn({ method: "POST" })
     if (!windowRes.data) {
       throw new Error("That delivery period isn't available. Please choose another one.");
     }
-    const schedule = getDeliverySchedule(windowRes.data.start_time);
-
     const { data: exception } = await supabaseAdmin
       .from("delivery_window_exceptions")
       .select("available")
@@ -160,7 +166,7 @@ export const createOrder = createServerFn({ method: "POST" })
       .eq("exception_date", schedule.deliveryDate)
       .maybeSingle();
 
-    const windowAvailable = exception ? exception.available : schedule.automaticallyAvailable;
+    const windowAvailable = exception ? exception.available : schedule.orderingOpen;
     if (!windowAvailable) {
       throw new Error("That delivery period has closed. Please choose another one.");
     }

@@ -14,6 +14,8 @@ export type Database = {
           business_name: string;
           closed_message: string;
           contact_phone: string;
+          delivery_end_time: string;
+          delivery_start_time: string;
           hero_heading: string;
           hero_image_path: string | null;
           hero_subheading: string;
@@ -21,10 +23,13 @@ export type Database = {
           momo_account_name: string;
           momo_enabled: boolean;
           momo_number: string;
+          order_cutoff_time: string;
+          order_open_time: string;
           parent_name: string;
           pod_enabled: boolean;
           promo_enabled: boolean;
           promo_message: string;
+          service_days: number[];
           updated_at: string;
           whatsapp_number: string;
         };
@@ -33,6 +38,8 @@ export type Database = {
           business_name?: string;
           closed_message?: string;
           contact_phone?: string;
+          delivery_end_time?: string;
+          delivery_start_time?: string;
           hero_heading?: string;
           hero_image_path?: string | null;
           hero_subheading?: string;
@@ -40,10 +47,13 @@ export type Database = {
           momo_account_name?: string;
           momo_enabled?: boolean;
           momo_number?: string;
+          order_cutoff_time?: string;
+          order_open_time?: string;
           parent_name?: string;
           pod_enabled?: boolean;
           promo_enabled?: boolean;
           promo_message?: string;
+          service_days?: number[];
           updated_at?: string;
           whatsapp_number?: string;
         };
@@ -52,6 +62,8 @@ export type Database = {
           business_name?: string;
           closed_message?: string;
           contact_phone?: string;
+          delivery_end_time?: string;
+          delivery_start_time?: string;
           hero_heading?: string;
           hero_image_path?: string | null;
           hero_subheading?: string;
@@ -59,10 +71,13 @@ export type Database = {
           momo_account_name?: string;
           momo_enabled?: boolean;
           momo_number?: string;
+          order_cutoff_time?: string;
+          order_open_time?: string;
           parent_name?: string;
           pod_enabled?: boolean;
           promo_enabled?: boolean;
           promo_message?: string;
+          service_days?: number[];
           updated_at?: string;
           whatsapp_number?: string;
         };
@@ -309,6 +324,125 @@ export type Database = {
           },
         ];
       };
+      combo_components: {
+        Row: {
+          combo_product_id: string;
+          component_product_id: string;
+          created_at: string;
+          quantity: number;
+        };
+        Insert: {
+          combo_product_id: string;
+          component_product_id: string;
+          created_at?: string;
+          quantity: number;
+        };
+        Update: {
+          combo_product_id?: string;
+          component_product_id?: string;
+          created_at?: string;
+          quantity?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "combo_components_combo_product_id_fkey";
+            columns: ["combo_product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "combo_components_component_product_id_fkey";
+            columns: ["component_product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expenses: {
+        Row: {
+          amount: number;
+          category: string;
+          created_at: string;
+          created_by: string;
+          description: string;
+          expense_date: string;
+          id: string;
+          notes: string;
+          payment_method: string;
+          receipt_path: string | null;
+          status: string;
+          supplier: string;
+          updated_at: string;
+        };
+        Insert: {
+          amount: number;
+          category: string;
+          created_at?: string;
+          created_by: string;
+          description: string;
+          expense_date?: string;
+          id?: string;
+          notes?: string;
+          payment_method: string;
+          receipt_path?: string | null;
+          status?: string;
+          supplier?: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount?: number;
+          category?: string;
+          description?: string;
+          expense_date?: string;
+          notes?: string;
+          payment_method?: string;
+          receipt_path?: string | null;
+          status?: string;
+          supplier?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      expense_audit_log: {
+        Row: {
+          action_type: string;
+          created_at: string;
+          expense_id: string;
+          id: string;
+          new_value: Json | null;
+          previous_value: Json | null;
+          staff_user_id: string | null;
+        };
+        Insert: {
+          action_type: string;
+          created_at?: string;
+          expense_id: string;
+          id?: string;
+          new_value?: Json | null;
+          previous_value?: Json | null;
+          staff_user_id?: string | null;
+        };
+        Update: {
+          action_type?: string;
+          created_at?: string;
+          expense_id?: string;
+          id?: string;
+          new_value?: Json | null;
+          previous_value?: Json | null;
+          staff_user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expense_audit_log_expense_id_fkey";
+            columns: ["expense_id"];
+            isOneToOne: false;
+            referencedRelation: "expenses";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       orders: {
         Row: {
           additional_instructions: string;
@@ -323,8 +457,11 @@ export type Database = {
           id: string;
           order_number: string;
           payment_method: string;
+          payment_received_at: string | null;
           payment_status: Database["public"]["Enums"]["payment_status"];
           promotion_code: string | null;
+          reconciled_at: string | null;
+          reconciled_by: string | null;
           status: Database["public"]["Enums"]["order_status"];
           subtotal: number;
           total: number;
@@ -342,8 +479,11 @@ export type Database = {
           id?: string;
           order_number?: string;
           payment_method: string;
+          payment_received_at?: string | null;
           payment_status?: Database["public"]["Enums"]["payment_status"];
           promotion_code?: string | null;
+          reconciled_at?: string | null;
+          reconciled_by?: string | null;
           status?: Database["public"]["Enums"]["order_status"];
           subtotal?: number;
           total?: number;
@@ -361,8 +501,11 @@ export type Database = {
           id?: string;
           order_number?: string;
           payment_method?: string;
+          payment_received_at?: string | null;
           payment_status?: Database["public"]["Enums"]["payment_status"];
           promotion_code?: string | null;
+          reconciled_at?: string | null;
+          reconciled_by?: string | null;
           status?: Database["public"]["Enums"]["order_status"];
           subtotal?: number;
           total?: number;
@@ -384,6 +527,7 @@ export type Database = {
           description: string;
           id: string;
           image_path: string | null;
+          kind: string;
           name: string;
           price: number;
           size: string | null;
@@ -396,6 +540,7 @@ export type Database = {
           description?: string;
           id?: string;
           image_path?: string | null;
+          kind?: string;
           name: string;
           price: number;
           size?: string | null;
@@ -408,6 +553,7 @@ export type Database = {
           description?: string;
           id?: string;
           image_path?: string | null;
+          kind?: string;
           name?: string;
           price?: number;
           size?: string | null;

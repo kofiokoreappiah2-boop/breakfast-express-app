@@ -8,23 +8,18 @@ export function SiteHeader() {
   const { itemCount } = useCart();
   const { data } = useStorefront();
   const name = data?.settings.businessName ?? BUSINESS.name;
-  const parent = data?.settings.parentName ?? BUSINESS.parent;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
       <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-3">
-        <Link to="/" className="flex min-w-0 items-center gap-2">
-          <span className="warm-gradient grid h-9 w-9 shrink-0 place-items-center rounded-xl font-display text-base font-bold text-primary-foreground">
-            E
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate font-display text-lg font-bold leading-tight">
-              {name}
-            </span>
-            <span className="block truncate text-[11px] text-muted-foreground">
-              by {parent}
-            </span>
-          </span>
+        <Link to="/" className="flex min-w-0 items-center" aria-label={`${name} home`}>
+          <img
+            src="/einyornose-wordmark.webp"
+            alt={name}
+            width={760}
+            height={135}
+            className="h-9 w-auto max-w-44 object-contain object-left sm:h-10 sm:max-w-56"
+          />
         </Link>
 
         <nav className="flex items-center gap-1 sm:gap-3">

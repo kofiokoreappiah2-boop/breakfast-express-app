@@ -1,17 +1,15 @@
 const GHANA_TIME_ZONE = "Africa/Accra";
-const NEXT_DAY_REOPEN_MINUTES = 17 * 60;
 
-// Cutoffs agreed for the three regular delivery periods.
-const CUTOFF_MINUTES_BY_START: Record<string, number> = {
-  "06:30": 5 * 60 + 30,
-  "09:30": 7 * 60 + 30,
-  "16:30": 14 * 60 + 30,
-};
+export const DELIVERY_WINDOW_LABEL = "6:30 AM – 7:15 AM";
+export const DELIVERY_START_TIME = "06:30";
+export const DELIVERY_END_TIME = "07:15";
+export const ORDER_OPEN_TIME = "17:00";
+export const ORDER_CUTOFF_TIME = "05:45";
 
-type GhanaClock = {
-  date: string;
-  minutes: number;
-};
+// Sunday (0) through Friday (5). Saturday is the weekly rest day.
+const SERVICE_DAYS = new Set([0, 1, 2, 3, 4, 5]);
+
+type GhanaClock = { date: string; instant: number };
 
 function ghanaClock(now: Date): GhanaClock {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -21,49 +19,85 @@ function ghanaClock(now: Date): GhanaClock {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hourCycle: "h23",
   }).formatToParts(now);
   const value = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? "";
-  const hour = Number(value("hour"));
-  const minute = Number(value("minute"));
+  const date = `${value("year")}-${value("month")}-${value("day")}`;
+  const instant = Date.UTC(
+    Number(value("year")),
+    Number(value("month")) - 1,
+    Number(value("day")),
+    Number(value("hour")),
+    Number(value("minute")),
+    Number(value("second")),
+  );
+  return { date, instant };
+}
 
-  return {
-    date: `${value("year")}-${value("month")}-${value("day")}`,
-    minutes: hour * 60 + minute,
-  };
+function dateAt(date: string, time: string): number {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  return Date.UTC(year, month - 1, day, hour, minute, 0);
 }
 
 function addDays(date: string, days: number): string {
   const [year, month, day] = date.split("-").map(Number);
-  const next = new Date(Date.UTC(year, month - 1, day + days));
-  return next.toISOString().slice(0, 10);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
-export type DeliverySchedule = {
+function isServiceDate(date: string): boolean {
+  const [year, month, day] = date.split("-").map(Number);
+  return SERVICE_DAYS.has(new Date(Date.UTC(year, month - 1, day)).getUTCDay());
+}
+
+function serviceWindow(deliveryDate: string) {
+  return {
+    opensAt: dateAt(addDays(deliveryDate, -1), ORDER_OPEN_TIME),
+    closesAt: dateAt(deliveryDate, ORDER_CUTOFF_TIME),
+  };
+}
+
+export type OrderSchedule = {
   deliveryDate: string;
-  automaticallyAvailable: boolean;
+  orderingOpen: boolean;
+  opensAt: string;
+  closesAt: string;
+  windowLabel: string;
 };
 
-/** Resolve a delivery period against the agreed Ghana-time ordering schedule. */
-export function getDeliverySchedule(startTime: string, now = new Date()): DeliverySchedule {
+/** Resolve the current or next ordering window in Ghana time. */
+export function getOrderSchedule(now = new Date()): OrderSchedule {
   const clock = ghanaClock(now);
+  let next: OrderSchedule | null = null;
 
-  // From 5 PM, every active period is available for the following day.
-  if (clock.minutes >= NEXT_DAY_REOPEN_MINUTES) {
-    return {
-      deliveryDate: addDays(clock.date, 1),
-      automaticallyAvailable: true,
+  for (let offset = 0; offset <= 8; offset += 1) {
+    const deliveryDate = addDays(clock.date, offset);
+    if (!isServiceDate(deliveryDate)) continue;
+    const window = serviceWindow(deliveryDate);
+    const schedule: OrderSchedule = {
+      deliveryDate,
+      orderingOpen: clock.instant >= window.opensAt && clock.instant < window.closesAt,
+      opensAt: new Date(window.opensAt).toISOString(),
+      closesAt: new Date(window.closesAt).toISOString(),
+      windowLabel: DELIVERY_WINDOW_LABEL,
     };
+    if (schedule.orderingOpen) return schedule;
+    if (window.opensAt > clock.instant && !next) next = schedule;
   }
 
-  const normalizedStart = startTime.slice(0, 5);
-  const cutoff = CUTOFF_MINUTES_BY_START[normalizedStart];
+  if (next) return next;
+  throw new Error("Could not resolve the next Einyornose service day.");
+}
 
+export type DeliverySchedule = { deliveryDate: string; automaticallyAvailable: boolean };
+
+/** Compatibility wrapper used by the control center. */
+export function getDeliverySchedule(_startTime: string, now = new Date()): DeliverySchedule {
+  const schedule = getOrderSchedule(now);
   return {
-    deliveryDate: clock.date,
-    // Unknown/custom periods remain controlled by their active flag and date
-    // exception instead of being accidentally hidden by this fixed schedule.
-    automaticallyAvailable: cutoff === undefined || clock.minutes < cutoff,
+    deliveryDate: schedule.deliveryDate,
+    automaticallyAvailable: schedule.orderingOpen,
   };
 }

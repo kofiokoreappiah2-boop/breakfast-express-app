@@ -19,7 +19,7 @@ export const Route = createFileRoute("/checkout")({
       { title: "Checkout — Einyornose" },
       {
         name: "description",
-        content: "Confirm your delivery hall, delivery period and payment method.",
+        content: "Confirm your delivery hall and payment method.",
       },
       { property: "og:title", content: "Checkout — Einyornose" },
       { property: "og:description", content: "Confirm delivery details and place your order." },
@@ -40,7 +40,7 @@ function CheckoutPage() {
   const { data: storefront, isLoading } = useStorefront();
   const settings = storefront?.settings;
   const locations = storefront?.locations ?? [];
-  const windows = storefront?.windows ?? [];
+  const ordering = storefront?.ordering;
   const paymentMethods: PaymentMethod[] = PAYMENT_METHODS.filter((method) =>
     method === "Mobile Money" ? (settings?.momoEnabled ?? true) : (settings?.podEnabled ?? true),
   );
@@ -54,7 +54,6 @@ function CheckoutPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
-  const [window_, setWindow] = useState("");
   const [payment, setPayment] = useState("");
   const [instructions, setInstructions] = useState("");
   const [errors, setErrors] = useState<Errors>({});
@@ -73,7 +72,7 @@ function CheckoutPage() {
     if (!/^[0-9+\s-]{9,20}$/.test(phone.trim()))
       next["phone"] = "Please enter a valid phone number so we can reach you.";
     if (!location) next["location"] = "Please choose your delivery location.";
-    if (!window_) next["window"] = "Please choose a delivery period.";
+    if (!ordering?.open) next["window"] = "Ordering is closed for this delivery run.";
     if (!payment) next["payment"] = "Please choose how you'd like to pay.";
     if (items.length === 0) next["items"] = "Your cart is empty — add an item first.";
     setErrors(next);
@@ -101,7 +100,7 @@ function CheckoutPage() {
           customerName: name.trim(),
           customerPhone: phone.trim(),
           deliveryLocation: location,
-          deliveryWindow: window_,
+          deliveryWindow: ordering?.windowLabel ?? "",
           paymentMethod: payment as PaymentMethod,
           additionalInstructions: instructions.trim(),
           clientRequestId: requestIdRef.current,
@@ -128,7 +127,20 @@ function CheckoutPage() {
       <main className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="font-display text-3xl font-bold">Checkout</h1>
 
-        {items.length === 0 ? (
+        {!ordering?.open ? (
+          <div className="surface-card mt-6 p-8 text-center">
+            <p className="text-xl font-bold">Orders for this run have closed</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Ordering reopens at 5:00 PM for the next available morning delivery.
+            </p>
+            <Link
+              to="/"
+              className="mt-5 inline-flex h-12 items-center rounded-xl bg-primary px-6 text-base font-semibold text-primary-foreground"
+            >
+              Back to Einyornose
+            </Link>
+          </div>
+        ) : items.length === 0 ? (
           <div className="surface-card mt-6 p-8 text-center">
             <p className="font-medium">You need at least one item to check out.</p>
             <Link
@@ -184,21 +196,21 @@ function CheckoutPage() {
                 </select>
               </Field>
 
-              <Field label="Delivery period" error={errors["window"]} htmlFor="window">
-                <select
-                  id="window"
-                  className={fieldClass}
-                  value={window_}
-                  onChange={(e) => setWindow(e.target.value)}
-                >
-                  <option value="">Select a delivery period</option>
-                  {windows.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              <div className="rounded-xl border border-primary/20 bg-secondary p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-primary">
+                  Your morning delivery
+                </p>
+                <p className="mt-1 font-bold">
+                  {new Intl.DateTimeFormat("en-GH", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                    timeZone: "Africa/Accra",
+                  }).format(new Date(`${ordering.deliveryDate}T12:00:00Z`))}
+                </p>
+                <p className="text-sm text-muted-foreground">{ordering.windowLabel}</p>
+              </div>
 
               <Field label="Additional delivery instructions (optional)" htmlFor="instructions">
                 <textarea

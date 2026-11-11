@@ -21,8 +21,10 @@ export function SiteFooter() {
           </a>
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} {name}</span>
-          <Link to="/auth" className="underline hover:text-foreground">
+          <span>
+            © {new Date().getFullYear()} {name}
+          </span>
+          <Link to="/staff" className="underline hover:text-foreground">
             Staff login
           </Link>
         </div>
