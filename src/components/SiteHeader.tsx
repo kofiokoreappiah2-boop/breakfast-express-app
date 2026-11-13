@@ -16,8 +16,8 @@ export function SiteHeader() {
           <img
             src="/einyornose-wordmark.webp"
             alt={name}
-            width={760}
-            height={135}
+            width={1312}
+            height={267}
             className="h-9 w-auto max-w-44 object-contain object-left sm:h-10 sm:max-w-56"
           />
         </Link>

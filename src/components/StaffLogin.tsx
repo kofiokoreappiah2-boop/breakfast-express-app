@@ -59,8 +59,8 @@ export function StaffLogin() {
           <img
             src="/einyornose-wordmark.webp"
             alt={BUSINESS.name}
-            width={760}
-            height={135}
+            width={1312}
+            height={267}
             className="mx-auto h-12 w-auto"
           />
         </Link>
