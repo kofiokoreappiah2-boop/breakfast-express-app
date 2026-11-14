@@ -5,8 +5,8 @@ import { money } from "@/lib/format";
 export const getMorningOperations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { assertStaff } = await import("@/lib/control-center.server");
-    await assertStaff(context);
+    const { assertPermission } = await import("@/lib/control-center.server");
+    await assertPermission(context, "operations.view");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { getOrderSchedule } = await import("@/lib/delivery-schedule");
     const schedule = getOrderSchedule();

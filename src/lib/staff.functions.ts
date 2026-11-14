@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { inviteStaffSchema, staffUpdateSchema } from "@/lib/staff.schemas";
+import type { StaffPermission } from "@/lib/staff.schemas";
 
 /** Who the signed-in user is, and what they're allowed to do. */
 export const getMyAccess = createServerFn({ method: "GET" })
@@ -15,7 +16,23 @@ export const getMyAccess = createServerFn({ method: "GET" })
     const roles = (data ?? []).map((row) => row.role as string);
     const isOwner = roles.includes("owner") || roles.includes("admin");
     const isStaff = isOwner || roles.includes("staff");
-    return { isOwner, isStaff, roles };
+    const { data: permissionRows } = await context.supabase
+      .from("staff_permissions")
+      .select("permission")
+      .eq("user_id", context.userId);
+    const permissions = (permissionRows ?? []).map((row) => row.permission as StaffPermission);
+    const can = (permission: StaffPermission) =>
+      isOwner || (isStaff && permissions.includes(permission));
+    return {
+      isOwner,
+      isStaff,
+      roles,
+      permissions,
+      canOperations: can("operations.view"),
+      canManageOrders: can("orders.manage"),
+      canViewFinance: can("finance.view") || can("finance.manage"),
+      canManageFinance: can("finance.manage"),
+    };
   });
 
 /** Owner: list everyone with access. */
@@ -35,7 +52,7 @@ export const inviteStaff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { assertOwner } = await import("@/lib/control-center.server");
     await assertOwner(context);
-    const { findOrInviteUser } = await import("@/lib/staff.server");
+    const { findOrInviteUser, setStaffPermissions } = await import("@/lib/staff.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const userId = await findOrInviteUser(data.email);
@@ -52,6 +69,11 @@ export const inviteStaff = createServerFn({ method: "POST" })
       { onConflict: "user_id,role" },
     );
     if (error) throw new Error("Could not grant access to that email address.");
+    await setStaffPermissions(
+      userId,
+      data.role === "owner" ? [] : data.permissions,
+      context.userId,
+    );
     return { ok: true };
   });
 
@@ -62,7 +84,7 @@ export const updateStaff = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { assertOwner } = await import("@/lib/control-center.server");
     await assertOwner(context);
-    const { assertNotLastActiveOwner } = await import("@/lib/staff.server");
+    const { assertNotLastActiveOwner, setStaffPermissions } = await import("@/lib/staff.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     if (data.active === false || data.role === "staff") {
@@ -75,6 +97,9 @@ export const updateStaff = createServerFn({ method: "POST" })
         .update({ role: data.role, updated_at: new Date().toISOString() })
         .eq("user_id", data.userId);
       if (error) throw new Error("Could not change that person's role.");
+      if (data.role === "owner") {
+        await setStaffPermissions(data.userId, [], context.userId);
+      }
     }
 
     if (typeof data.active === "boolean") {
@@ -83,6 +108,10 @@ export const updateStaff = createServerFn({ method: "POST" })
         .update({ active: data.active, updated_at: new Date().toISOString() })
         .eq("user_id", data.userId);
       if (error) throw new Error("Could not change that person's access.");
+    }
+
+    if (data.permissions) {
+      await setStaffPermissions(data.userId, data.permissions, context.userId);
     }
 
     return { ok: true };

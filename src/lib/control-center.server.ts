@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { StaffPermission } from "@/lib/staff.schemas";
 
 type AuthContext = { supabase: SupabaseClient; userId: string };
 
@@ -28,9 +29,22 @@ export async function assertStaff(context: AuthContext) {
   }
 }
 
+/** Throws unless the caller is an owner or has the exact active staff permission. */
+export async function assertPermission(context: AuthContext, permission: StaffPermission) {
+  const roles = await activeRoles(context);
+  if (roles.includes("owner") || roles.includes("admin")) return;
+  if (!roles.includes("staff")) throw new Error("Staff access required.");
+  const { data } = await context.supabase
+    .from("staff_permissions")
+    .select("permission")
+    .eq("user_id", context.userId)
+    .eq("permission", permission)
+    .maybeSingle();
+  if (!data) throw new Error("You do not have permission to open this area.");
+}
+
 /** Legacy alias kept so existing call sites stay valid. */
 export const assertAdmin = assertOwner;
-
 
 const BUCKET = "product-images";
 

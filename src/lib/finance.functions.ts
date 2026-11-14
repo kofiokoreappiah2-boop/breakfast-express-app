@@ -12,8 +12,8 @@ export const getFinanceSummary = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => financeRangeSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { assertOwner } = await import("@/lib/control-center.server");
-    await assertOwner(context);
+    const { assertPermission } = await import("@/lib/control-center.server");
+    await assertPermission(context, "finance.view");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const start = `${data.startDate}T00:00:00.000Z`;
@@ -101,8 +101,8 @@ export const addExpense = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => expenseSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { assertOwner } = await import("@/lib/control-center.server");
-    await assertOwner(context);
+    const { assertPermission } = await import("@/lib/control-center.server");
+    await assertPermission(context, "finance.manage");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const row = {
       expense_date: data.expenseDate,
@@ -133,8 +133,8 @@ export const voidExpense = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => voidExpenseSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { assertOwner } = await import("@/lib/control-center.server");
-    await assertOwner(context);
+    const { assertPermission } = await import("@/lib/control-center.server");
+    await assertPermission(context, "finance.manage");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: previous } = await supabaseAdmin
       .from("expenses")
@@ -163,8 +163,8 @@ export const reconcileOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => reconcileOrderSchema.parse(data))
   .handler(async ({ data, context }) => {
-    const { assertOwner } = await import("@/lib/control-center.server");
-    await assertOwner(context);
+    const { assertPermission } = await import("@/lib/control-center.server");
+    await assertPermission(context, "finance.manage");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: previous } = await supabaseAdmin
       .from("orders")

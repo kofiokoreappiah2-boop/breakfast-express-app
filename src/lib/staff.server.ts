@@ -1,10 +1,11 @@
-import type { StaffRole } from "@/lib/staff.schemas";
+import type { StaffPermission, StaffRole } from "@/lib/staff.schemas";
 
 export type StaffMember = {
   userId: string;
   email: string;
   role: StaffRole | "admin";
   active: boolean;
+  permissions: StaffPermission[];
   createdAt: string;
   isSelf: boolean;
 };
@@ -19,6 +20,21 @@ export async function listStaffMembers(currentUserId: string): Promise<StaffMemb
     .order("created_at", { ascending: true });
   if (error) throw new Error("Could not load the staff list.");
 
+  const userIds = (rows ?? []).map((row) => row.user_id as string);
+  const permissionMap = new Map<string, StaffPermission[]>();
+  if (userIds.length > 0) {
+    const { data: permissions, error: permissionsError } = await supabaseAdmin
+      .from("staff_permissions")
+      .select("user_id, permission")
+      .in("user_id", userIds);
+    if (permissionsError) throw new Error("Could not load staff permissions.");
+    for (const row of permissions ?? []) {
+      const current = permissionMap.get(row.user_id) ?? [];
+      current.push(row.permission as StaffPermission);
+      permissionMap.set(row.user_id, current);
+    }
+  }
+
   const members: StaffMember[] = [];
   for (const row of rows ?? []) {
     let email = (row.email as string | null) ?? "";
@@ -31,11 +47,39 @@ export async function listStaffMembers(currentUserId: string): Promise<StaffMemb
       email,
       role: row.role as StaffRole | "admin",
       active: row.active as boolean,
+      permissions: permissionMap.get(row.user_id as string) ?? [],
       createdAt: row.created_at as string,
       isSelf: row.user_id === currentUserId,
     });
   }
   return members;
+}
+
+/** Replace one staff member's exact permission set. Owner accounts need no permission rows. */
+export async function setStaffPermissions(
+  userId: string,
+  permissions: StaffPermission[],
+  grantedBy: string,
+) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const unique = [...new Set(permissions)];
+  if (unique.includes("finance.manage") && !unique.includes("finance.view")) {
+    unique.push("finance.view");
+  }
+  const { error: deleteError } = await supabaseAdmin
+    .from("staff_permissions")
+    .delete()
+    .eq("user_id", userId);
+  if (deleteError) throw new Error("Could not reset that person's permissions.");
+  if (unique.length === 0) return;
+  const { error: insertError } = await supabaseAdmin.from("staff_permissions").insert(
+    unique.map((permission) => ({
+      user_id: userId,
+      permission,
+      granted_by: grantedBy,
+    })),
+  );
+  if (insertError) throw new Error("Could not save that person's permissions.");
 }
 
 /** Find an existing auth user by email, or invite a brand new one. */

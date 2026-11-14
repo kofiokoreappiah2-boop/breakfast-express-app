@@ -50,7 +50,7 @@ function FinancePage() {
   const finance = useQuery({
     queryKey: ["finance", startDate, endDate],
     queryFn: () => loadFinance({ data: { startDate, endDate } }),
-    enabled: access.data?.isOwner === true,
+    enabled: access.data?.canViewFinance === true,
   });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["finance"] });
@@ -91,11 +91,13 @@ function FinancePage() {
   );
 
   if (access.isLoading) return <p className="p-10 text-center">Checking access…</p>;
-  if (!access.data?.isOwner) {
+  if (!access.data?.canViewFinance) {
     return (
       <main className="mx-auto max-w-md px-4 py-20 text-center">
-        <h1 className="text-3xl font-bold">Owner access required</h1>
-        <p className="mt-3 text-muted-foreground">Finance records are restricted to the owner.</p>
+        <h1 className="text-3xl font-bold">Finance access required</h1>
+        <p className="mt-3 text-muted-foreground">
+          Ask the owner to add Finance overview to your account.
+        </p>
         <Link
           to="/staff/dashboard"
           className="mt-5 inline-flex rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground"
@@ -112,7 +114,9 @@ function FinancePage() {
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.14em] text-primary">Owner only</p>
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-primary">
+              Finance records
+            </p>
             <h1 className="mt-1 text-3xl font-bold">Finance</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Income comes from website orders. Enter only business expenses manually.
@@ -149,102 +153,115 @@ function FinancePage() {
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <form
-            className="surface-card p-5"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!form.description.trim() || Number(form.amount) <= 0) {
-                toast.error("Add a description and valid amount.");
-                return;
-              }
-              expenseMutation.mutate();
-            }}
-          >
-            <h2 className="flex items-center gap-2 text-xl font-bold">
-              <Plus className="h-5 w-5 text-primary" /> Record expense
-            </h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-semibold">
-                Date
-                <input
-                  type="date"
-                  className={`${fieldClass} mt-1`}
-                  value={form.expenseDate}
-                  onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
-                />
-              </label>
-              <label className="text-sm font-semibold">
-                Amount
-                <input
-                  inputMode="decimal"
-                  className={`${fieldClass} mt-1`}
-                  placeholder="0.00"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                />
-              </label>
-              <label className="text-sm font-semibold">
-                Category
-                <select
-                  className={`${fieldClass} mt-1`}
-                  value={form.category}
-                  onChange={(e) =>
-                    setForm({ ...form, category: e.target.value as typeof form.category })
-                  }
-                >
-                  {EXPENSE_CATEGORIES.map((category) => (
-                    <option key={category}>{category}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-semibold">
-                Paid with
-                <select
-                  className={`${fieldClass} mt-1`}
-                  value={form.paymentMethod}
-                  onChange={(e) =>
-                    setForm({ ...form, paymentMethod: e.target.value as typeof form.paymentMethod })
-                  }
-                >
-                  {EXPENSE_PAYMENT_METHODS.map((method) => (
-                    <option key={method}>{method}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm font-semibold sm:col-span-2">
-                Description
-                <input
-                  className={`${fieldClass} mt-1`}
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  placeholder="What was purchased?"
-                />
-              </label>
-              <label className="text-sm font-semibold sm:col-span-2">
-                Supplier
-                <input
-                  className={`${fieldClass} mt-1`}
-                  value={form.supplier}
-                  onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-                  placeholder="Optional"
-                />
-              </label>
-              <label className="text-sm font-semibold sm:col-span-2">
-                Notes
-                <textarea
-                  className="mt-1 min-h-20 w-full rounded-xl border border-input bg-card p-3 text-sm"
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                />
-              </label>
-            </div>
-            <button
-              disabled={expenseMutation.isPending}
-              className="mt-4 h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground disabled:opacity-60"
+          {access.data.canManageFinance ? (
+            <form
+              className="surface-card p-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!form.description.trim() || Number(form.amount) <= 0) {
+                  toast.error("Add a description and valid amount.");
+                  return;
+                }
+                expenseMutation.mutate();
+              }}
             >
-              {expenseMutation.isPending ? "Saving…" : "Save expense"}
-            </button>
-          </form>
+              <h2 className="flex items-center gap-2 text-xl font-bold">
+                <Plus className="h-5 w-5 text-primary" /> Record expense
+              </h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-semibold">
+                  Date
+                  <input
+                    type="date"
+                    className={`${fieldClass} mt-1`}
+                    value={form.expenseDate}
+                    onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+                  />
+                </label>
+                <label className="text-sm font-semibold">
+                  Amount
+                  <input
+                    inputMode="decimal"
+                    className={`${fieldClass} mt-1`}
+                    placeholder="0.00"
+                    value={form.amount}
+                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                  />
+                </label>
+                <label className="text-sm font-semibold">
+                  Category
+                  <select
+                    className={`${fieldClass} mt-1`}
+                    value={form.category}
+                    onChange={(e) =>
+                      setForm({ ...form, category: e.target.value as typeof form.category })
+                    }
+                  >
+                    {EXPENSE_CATEGORIES.map((category) => (
+                      <option key={category}>{category}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold">
+                  Paid with
+                  <select
+                    className={`${fieldClass} mt-1`}
+                    value={form.paymentMethod}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        paymentMethod: e.target.value as typeof form.paymentMethod,
+                      })
+                    }
+                  >
+                    {EXPENSE_PAYMENT_METHODS.map((method) => (
+                      <option key={method}>{method}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold sm:col-span-2">
+                  Description
+                  <input
+                    className={`${fieldClass} mt-1`}
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    placeholder="What was purchased?"
+                  />
+                </label>
+                <label className="text-sm font-semibold sm:col-span-2">
+                  Supplier
+                  <input
+                    className={`${fieldClass} mt-1`}
+                    value={form.supplier}
+                    onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                    placeholder="Optional"
+                  />
+                </label>
+                <label className="text-sm font-semibold sm:col-span-2">
+                  Notes
+                  <textarea
+                    className="mt-1 min-h-20 w-full rounded-xl border border-input bg-card p-3 text-sm"
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  />
+                </label>
+              </div>
+              <button
+                disabled={expenseMutation.isPending}
+                className="mt-4 h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground disabled:opacity-60"
+              >
+                {expenseMutation.isPending ? "Saving…" : "Save expense"}
+              </button>
+            </form>
+          ) : (
+            <div className="surface-card p-5">
+              <h2 className="text-xl font-bold">View-only access</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                You can review the figures, but only finance managers can record expenses or
+                reconcile payments.
+              </p>
+            </div>
+          )}
 
           <div className="surface-card overflow-hidden">
             <div className="p-5">
@@ -272,12 +289,16 @@ function FinancePage() {
                       <td className="px-4 py-3">{order.paymentMethod}</td>
                       <td className="px-4 py-3">{formatCedis(order.total)}</td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => reconcileMutation.mutate(order.id)}
-                          className="rounded-lg border border-primary px-3 py-2 text-xs font-bold text-primary"
-                        >
-                          Mark received
-                        </button>
+                        {access.data.canManageFinance ? (
+                          <button
+                            onClick={() => reconcileMutation.mutate(order.id)}
+                            className="rounded-lg border border-primary px-3 py-2 text-xs font-bold text-primary"
+                          >
+                            Mark received
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Awaiting receipt</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -321,7 +342,7 @@ function FinancePage() {
                     <td className="px-4 py-3">{expense.supplier || "—"}</td>
                     <td className="px-4 py-3">{formatCedis(expense.amount)}</td>
                     <td className="px-4 py-3 text-right">
-                      {expense.status === "Posted" ? (
+                      {expense.status === "Posted" && access.data.canManageFinance ? (
                         <button
                           onClick={() => voidMutation.mutate(expense.id)}
                           className="text-xs font-semibold text-destructive underline"

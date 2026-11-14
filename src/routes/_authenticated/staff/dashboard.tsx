@@ -19,20 +19,22 @@ function StaffDashboard() {
   const operations = useQuery({
     queryKey: ["morning-operations"],
     queryFn: () => loadOperations({}),
-    enabled: access.data?.isStaff === true,
+    enabled: access.data?.canOperations === true,
   });
 
   if (access.isLoading) return <p className="p-10 text-center">Checking staff access…</p>;
-  if (!access.data?.isStaff) {
+  if (!access.data?.canOperations) {
     return (
       <main className="mx-auto max-w-md px-4 py-20 text-center">
-        <h1 className="text-3xl font-bold">Staff access required</h1>
-        <p className="mt-3 text-muted-foreground">Ask the owner to activate your account.</p>
+        <h1 className="text-3xl font-bold">Morning access required</h1>
+        <p className="mt-3 text-muted-foreground">
+          Ask the owner to add Morning operations to your account.
+        </p>
         <Link
           to="/admin"
           className="mt-6 inline-flex rounded-xl bg-primary px-5 py-3 font-bold text-primary-foreground"
         >
-          Set up owner access
+          Open available staff area
         </Link>
       </main>
     );
@@ -53,12 +55,14 @@ function StaffDashboard() {
               {data?.deliveryDate ?? "Loading…"} · {data?.windowLabel ?? "6:30 AM – 7:15 AM"}
             </p>
           </div>
-          <Link
-            to="/admin"
-            className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 font-bold text-primary-foreground"
-          >
-            <ClipboardList className="h-4 w-4" /> Open orders
-          </Link>
+          {access.data.canManageOrders ? (
+            <Link
+              to="/admin"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-4 font-bold text-primary-foreground"
+            >
+              <ClipboardList className="h-4 w-4" /> Open orders
+            </Link>
+          ) : null}
         </div>
 
         <section className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -108,7 +112,7 @@ function StaffDashboard() {
           </div>
         </section>
 
-        {access.data.isOwner ? (
+        {access.data.canViewFinance ? (
           <Link
             to="/staff/finance"
             className="surface-card mt-6 flex items-center justify-between gap-4 p-5 hover:border-primary"

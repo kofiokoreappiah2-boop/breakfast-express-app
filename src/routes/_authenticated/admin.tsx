@@ -15,7 +15,6 @@ import {
   type OrderStatus,
   type PaymentStatus,
 } from "@/lib/constants";
-import { claimAdmin } from "@/lib/admin.functions";
 import { getMyAccess } from "@/lib/staff.functions";
 import { getOrderHistory } from "@/lib/control-center.functions";
 import {
@@ -74,8 +73,6 @@ const selectClass =
 function AdminPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const claim = useServerFn(claimAdmin);
-
   const [filters, setFilters] = useState<OrderFilters>(EMPTY_FILTERS);
   const setFilter = <K extends keyof OrderFilters>(key: K, value: OrderFilters[K]) =>
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -88,12 +85,12 @@ function AdminPage() {
     queryFn: () => loadAccess({}),
   });
 
-  const isStaff = rolesQuery.data?.isStaff === true;
+  const canManageOrders = rolesQuery.data?.canManageOrders === true;
   const isOwner = rolesQuery.data?.isOwner === true;
 
   const ordersQuery = useQuery({
     queryKey: ["admin-orders"],
-    enabled: isStaff,
+    enabled: canManageOrders,
 
     queryFn: async (): Promise<OrderRow[]> => {
       const { data, error } = await supabase
@@ -204,35 +201,18 @@ function AdminPage() {
     return <p className="p-8 text-center text-muted-foreground">Checking your access…</p>;
   }
 
-  if (!isStaff) {
+  if (!canManageOrders) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="font-display text-2xl font-bold">Staff access required</h1>
+        <h1 className="font-display text-2xl font-bold">Order access required</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your account doesn't have access yet. If you are the {BUSINESS.name} owner setting up the
-          store for the first time, you can claim owner access now. Otherwise ask the owner to
-          invite you from the control center.
+          Your account cannot manage orders. Ask the {BUSINESS.name} owner to add Orders access in
+          Staff management.
         </p>
         <button
           type="button"
-          onClick={async () => {
-            try {
-              await claim({});
-              toast.success("You are now the owner.");
-              void rolesQuery.refetch();
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : "Could not grant owner access.");
-            }
-          }}
-          className="mt-6 h-12 w-full rounded-xl bg-primary text-base font-semibold text-primary-foreground"
-        >
-          Claim owner access
-        </button>
-
-        <button
-          type="button"
           onClick={signOut}
-          className="mt-3 h-11 w-full rounded-xl border border-border text-sm font-medium"
+          className="mt-6 h-11 w-full rounded-xl border border-border text-sm font-medium"
         >
           Sign out
         </button>

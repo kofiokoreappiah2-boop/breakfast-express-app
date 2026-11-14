@@ -489,8 +489,8 @@ export const getOrderHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) => idSchema.parse(data))
   .handler(async ({ data, context }): Promise<AuditEntry[]> => {
-    const { assertStaff } = await import("@/lib/control-center.server");
-    await assertStaff(context);
+    const { assertPermission } = await import("@/lib/control-center.server");
+    await assertPermission(context, "orders.manage");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

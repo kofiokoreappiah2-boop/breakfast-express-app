@@ -1,18 +1,27 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { ClipboardList, Home, LogOut, Settings, WalletCards } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-
-const links = [
-  { to: "/staff/dashboard", label: "Morning", icon: Home },
-  { to: "/admin", label: "Orders", icon: ClipboardList },
-  { to: "/staff/finance", label: "Finance", icon: WalletCards },
-  { to: "/settings", label: "Settings", icon: Settings },
-] as const;
+import { getMyAccess } from "@/lib/staff.functions";
 
 export function StaffNav() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const loadAccess = useServerFn(getMyAccess);
+  const access = useQuery({ queryKey: ["my-access"], queryFn: () => loadAccess({}) });
+  const links = [
+    access.data?.canOperations
+      ? { to: "/staff/dashboard" as const, label: "Morning", icon: Home }
+      : null,
+    access.data?.canManageOrders
+      ? { to: "/admin" as const, label: "Orders", icon: ClipboardList }
+      : null,
+    access.data?.canViewFinance
+      ? { to: "/staff/finance" as const, label: "Finance", icon: WalletCards }
+      : null,
+    access.data?.isOwner ? { to: "/settings" as const, label: "Settings", icon: Settings } : null,
+  ].filter((link) => link !== null);
 
   return (
     <header className="border-b border-border bg-card">

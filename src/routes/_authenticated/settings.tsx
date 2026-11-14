@@ -26,7 +26,13 @@ import {
   type ControlCenterData,
 } from "@/lib/control-center.functions";
 import { inviteStaff, listStaff, updateStaff } from "@/lib/staff.functions";
-import type { StaffRole } from "@/lib/staff.schemas";
+import {
+  STAFF_PERMISSION_OPTIONS,
+  STAFF_PRESETS,
+  type StaffPermission,
+  type StaffPreset,
+  type StaffRole,
+} from "@/lib/staff.schemas";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({
@@ -1235,12 +1241,17 @@ function StaffSection() {
 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<StaffRole>("staff");
+  const [preset, setPreset] = useState<StaffPreset>("operations");
+  const [permissions, setPermissions] = useState<StaffPermission[]>([
+    ...STAFF_PRESETS.operations.permissions,
+  ]);
 
   const staffQuery = useQuery({ queryKey: ["staff"], queryFn: () => load() });
   const refreshStaff = () => void queryClient.invalidateQueries({ queryKey: ["staff"] });
 
   const inviteMutation = useMutation({
-    mutationFn: (payload: { email: string; role: StaffRole }) => invite({ data: payload }),
+    mutationFn: (payload: { email: string; role: StaffRole; permissions: StaffPermission[] }) =>
+      invite({ data: payload }),
     onSuccess: () => {
       toast.success("Invitation sent. They'll have access as soon as they sign in.");
       setEmail("");
@@ -1251,8 +1262,12 @@ function StaffSection() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { userId: string; role?: StaffRole; active?: boolean }) =>
-      update({ data: payload }),
+    mutationFn: (payload: {
+      userId: string;
+      role?: StaffRole;
+      active?: boolean;
+      permissions?: StaffPermission[];
+    }) => update({ data: payload }),
     onSuccess: () => {
       toast.success("Staff access updated.");
       refreshStaff();
@@ -1264,17 +1279,21 @@ function StaffSection() {
   return (
     <Card
       title="Staff management"
-      description="Owners can change everything here. Staff can only view and update orders and payment status."
+      description="Start with a role template, then adjust each person's exact access. Staff management, security and full owner control stay locked to owners."
     >
       <form
-        className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto]"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
         onSubmit={(event) => {
           event.preventDefault();
           if (!email.trim()) {
             toast.error("Enter an email address first.");
             return;
           }
-          inviteMutation.mutate({ email: email.trim(), role });
+          inviteMutation.mutate({
+            email: email.trim(),
+            role,
+            permissions: role === "owner" ? [] : permissions,
+          });
         }}
       >
         <label className={label}>
@@ -1293,15 +1312,52 @@ function StaffSection() {
           <select
             className={`${input} mt-1 sm:w-40`}
             value={role}
-            onChange={(event) => setRole(event.target.value as StaffRole)}
+            onChange={(event) => {
+              const nextRole = event.target.value as StaffRole;
+              setRole(nextRole);
+              if (nextRole === "staff" && permissions.length === 0) {
+                setPreset("operations");
+                setPermissions([...STAFF_PRESETS.operations.permissions]);
+              }
+            }}
           >
             <option value="staff">Staff</option>
             <option value="owner">Owner</option>
           </select>
         </label>
+        <label className={label}>
+          Template
+          <select
+            className={`${input} mt-1 sm:w-44`}
+            value={role === "owner" ? "custom" : preset}
+            disabled={role === "owner"}
+            onChange={(event) => {
+              const nextPreset = event.target.value as StaffPreset;
+              setPreset(nextPreset);
+              setPermissions([...STAFF_PRESETS[nextPreset].permissions]);
+            }}
+          >
+            {Object.entries(STAFF_PRESETS).map(([id, definition]) => (
+              <option key={id} value={id}>
+                {definition.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="submit" className={`${button} sm:mt-6`} disabled={inviteMutation.isPending}>
           {inviteMutation.isPending ? "Inviting…" : "Invite"}
         </button>
+        {role === "staff" ? (
+          <div className="sm:col-span-2 lg:col-span-4">
+            <PermissionPicker
+              permissions={permissions}
+              onChange={(next) => {
+                setPreset("custom");
+                setPermissions(next);
+              }}
+            />
+          </div>
+        ) : null}
       </form>
 
       <div className="mt-5 space-y-3">
@@ -1311,47 +1367,143 @@ function StaffSection() {
           <p className="text-sm text-muted-foreground">No staff added yet.</p>
         ) : (
           staffQuery.data?.map((member) => (
-            <div
-              key={member.userId}
-              className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">
-                  {member.email || "Pending invitation"}
-                  {member.isSelf ? " (you)" : ""}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {member.active ? "Active" : "Access deactivated"}
-                </p>
+            <div key={member.userId} className="rounded-xl border border-border p-4">
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {member.email || "Pending invitation"}
+                    {member.isSelf ? " (you)" : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {member.active ? "Active" : "Access deactivated"}
+                  </p>
+                </div>
+                <select
+                  aria-label={`Access level for ${member.email}`}
+                  className={`${input} sm:w-36`}
+                  value={member.role === "admin" ? "owner" : member.role}
+                  onChange={(event) =>
+                    updateMutation.mutate({
+                      userId: member.userId,
+                      role: event.target.value as StaffRole,
+                      permissions:
+                        event.target.value === "staff"
+                          ? [...STAFF_PRESETS.operations.permissions]
+                          : [],
+                    })
+                  }
+                >
+                  <option value="staff">Staff</option>
+                  <option value="owner">Owner</option>
+                </select>
+                <button
+                  type="button"
+                  className={ghost}
+                  disabled={updateMutation.isPending}
+                  onClick={() =>
+                    updateMutation.mutate({ userId: member.userId, active: !member.active })
+                  }
+                >
+                  {member.active ? "Deactivate" : "Reactivate"}
+                </button>
               </div>
-              <select
-                aria-label={`Access level for ${member.email}`}
-                className={`${input} sm:w-36`}
-                value={member.role === "admin" ? "owner" : member.role}
-                onChange={(event) =>
-                  updateMutation.mutate({
-                    userId: member.userId,
-                    role: event.target.value as StaffRole,
-                  })
-                }
-              >
-                <option value="staff">Staff</option>
-                <option value="owner">Owner</option>
-              </select>
-              <button
-                type="button"
-                className={ghost}
-                disabled={updateMutation.isPending}
-                onClick={() =>
-                  updateMutation.mutate({ userId: member.userId, active: !member.active })
-                }
-              >
-                {member.active ? "Deactivate" : "Reactivate"}
-              </button>
+              {member.role === "staff" ? (
+                <div className="mt-4 space-y-3 border-t border-border pt-4">
+                  <label className={label}>
+                    Permission template
+                    <select
+                      className={`${input} mt-1 max-w-xs`}
+                      value={findPreset(member.permissions)}
+                      onChange={(event) => {
+                        const nextPreset = event.target.value as StaffPreset;
+                        if (nextPreset === "custom") return;
+                        updateMutation.mutate({
+                          userId: member.userId,
+                          permissions: [...STAFF_PRESETS[nextPreset].permissions],
+                        });
+                      }}
+                    >
+                      {Object.entries(STAFF_PRESETS).map(([id, definition]) => (
+                        <option key={id} value={id}>
+                          {definition.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <PermissionPicker
+                    permissions={member.permissions}
+                    disabled={!member.active || updateMutation.isPending}
+                    onChange={(next) =>
+                      updateMutation.mutate({ userId: member.userId, permissions: next })
+                    }
+                  />
+                </div>
+              ) : (
+                <p className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
+                  Owners automatically have complete access. Individual switches do not apply.
+                </p>
+              )}
             </div>
           ))
         )}
       </div>
     </Card>
   );
+}
+
+function PermissionPicker({
+  permissions,
+  disabled = false,
+  onChange,
+}: {
+  permissions: StaffPermission[];
+  disabled?: boolean;
+  onChange: (permissions: StaffPermission[]) => void;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {STAFF_PERMISSION_OPTIONS.map((option) => {
+        const checked = permissions.includes(option.id);
+        return (
+          <label
+            key={option.id}
+            className="flex gap-3 rounded-xl border border-border bg-card p-3 text-sm"
+          >
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 accent-primary"
+              checked={checked}
+              disabled={disabled}
+              onChange={(event) => {
+                let next = event.target.checked
+                  ? [...permissions, option.id]
+                  : permissions.filter((permission) => permission !== option.id);
+                if (option.id === "finance.manage" && event.target.checked) {
+                  next = [...new Set([...next, "finance.view" as StaffPermission])];
+                }
+                if (option.id === "finance.view" && !event.target.checked) {
+                  next = next.filter((permission) => permission !== "finance.manage");
+                }
+                onChange(next);
+              }}
+            />
+            <span>
+              <strong className="block">{option.label}</strong>
+              <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                {option.description}
+              </span>
+            </span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+function findPreset(permissions: StaffPermission[]): StaffPreset {
+  const sorted = [...permissions].sort().join("|");
+  for (const [id, definition] of Object.entries(STAFF_PRESETS)) {
+    if ([...definition.permissions].sort().join("|") === sorted) return id as StaffPreset;
+  }
+  return "custom";
 }
