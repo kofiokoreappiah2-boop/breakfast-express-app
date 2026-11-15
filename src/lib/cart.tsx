@@ -23,6 +23,7 @@ type CartContextValue = {
   subtotal: number;
   total: number;
   addItem: (item: Omit<CartItem, "quantity">, quantity: number) => void;
+  addItems: (additions: Array<{ item: Omit<CartItem, "quantity">; quantity: number }>) => void;
   setQuantity: (productId: string, quantity: number) => void;
   removeItem: (productId: string) => void;
   clearCart: () => void;
@@ -81,6 +82,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const addItems = useCallback(
+    (additions: Array<{ item: Omit<CartItem, "quantity">; quantity: number }>) => {
+      setItems((previous) => {
+        const next = previous.map((item) => ({ ...item }));
+
+        for (const addition of additions) {
+          const quantity = Math.max(1, Math.min(100, Math.floor(addition.quantity)));
+          const existing = next.find((item) => item.productId === addition.item.productId);
+
+          if (existing) {
+            existing.quantity = Math.min(100, existing.quantity + quantity);
+            existing.price = addition.item.price;
+            existing.name = addition.item.name;
+            existing.size = addition.item.size;
+          } else {
+            next.push({ ...addition.item, quantity });
+          }
+        }
+
+        return next;
+      });
+    },
+    [],
+  );
+
   const setQuantity = useCallback((productId: string, quantity: number) => {
     setItems((prev) =>
       quantity <= 0
@@ -105,11 +131,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       subtotal,
       total: subtotal,
       addItem,
+      addItems,
       setQuantity,
       removeItem,
       clearCart,
     };
-  }, [items, addItem, setQuantity, removeItem, clearCart]);
+  }, [items, addItem, addItems, setQuantity, removeItem, clearCart]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

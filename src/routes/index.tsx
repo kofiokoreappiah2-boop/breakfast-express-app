@@ -5,6 +5,7 @@ import { Clock, ExternalLink, ImageOff, MapPin, Phone, ShoppingBag } from "lucid
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ProductCard } from "@/components/ProductCard";
+import { BreakfastPairings } from "@/components/BreakfastPairings";
 import { MaintenancePage, MaintenancePageLoading } from "@/components/MaintenancePage";
 import { BUSINESS } from "@/lib/constants";
 import { useCart } from "@/lib/cart";
@@ -282,6 +283,10 @@ function HomePage() {
             </>
           )}
         </section>
+
+        {individualItems.length > 0 ? (
+          <BreakfastPairings products={individualItems} orderingOpen={ordering?.open} />
+        ) : null}
 
         {gallery.length > 0 ? (
           <section className="mx-auto max-w-5xl px-4 py-6">
