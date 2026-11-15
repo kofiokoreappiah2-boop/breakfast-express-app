@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Construction, MessageCircle } from "lucide-react";
+import { Clock3, Construction, MessageCircle } from "lucide-react";
 
 import { BUSINESS } from "@/lib/constants";
 import type { StorefrontSettings } from "@/lib/storefront.functions";
@@ -8,7 +9,21 @@ type MaintenancePageProps = {
   settings?: StorefrontSettings;
 };
 
+const REOPEN_AT = new Date("2026-11-15T18:00:00Z").getTime();
+
+function getRemainingTime() {
+  const remaining = Math.max(0, REOPEN_AT - Date.now());
+
+  return {
+    total: remaining,
+    hours: Math.floor(remaining / 3_600_000),
+    minutes: Math.floor((remaining % 3_600_000) / 60_000),
+    seconds: Math.floor((remaining % 60_000) / 1_000),
+  };
+}
+
 export function MaintenancePage({ settings }: MaintenancePageProps) {
+  const [remaining, setRemaining] = useState(getRemainingTime);
   const businessName = settings?.businessName ?? BUSINESS.name;
   const parentName = settings?.parentName ?? BUSINESS.parent;
   const message =
@@ -17,6 +32,22 @@ export function MaintenancePage({ settings }: MaintenancePageProps) {
   const whatsappUrl = settings?.whatsappNumber
     ? `https://wa.me/${settings.whatsappNumber.replace(/\D/g, "")}`
     : BUSINESS.whatsappUrl;
+  const showCountdown = message.includes("6:00 PM today") && remaining.total > 0;
+
+  useEffect(() => {
+    if (!showCountdown) return;
+
+    const timer = window.setInterval(() => setRemaining(getRemainingTime()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [showCountdown]);
+
+  useEffect(() => {
+    if (!message.includes("6:00 PM today") || remaining.total > 0) return;
+    if (window.sessionStorage.getItem("einyornose-reopen-refresh") === "done") return;
+
+    window.sessionStorage.setItem("einyornose-reopen-refresh", "done");
+    window.location.reload();
+  }, [message, remaining.total]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
@@ -55,6 +86,33 @@ export function MaintenancePage({ settings }: MaintenancePageProps) {
             <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
               {message}
             </p>
+            {showCountdown ? (
+              <div
+                className="mt-7 rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5"
+                aria-live="polite"
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                  <Clock3 className="h-4 w-4" aria-hidden="true" />
+                  Ordering reopens in
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-3" role="timer">
+                  {[
+                    ["Hours", remaining.hours],
+                    ["Minutes", remaining.minutes],
+                    ["Seconds", remaining.seconds],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl bg-background px-3 py-3 text-center shadow-sm">
+                      <span className="block font-display text-3xl font-bold tabular-nums sm:text-4xl">
+                        {String(value).padStart(2, "0")}
+                      </span>
+                      <span className="mt-1 block text-[0.65rem] font-bold uppercase tracking-wider text-muted-foreground">
+                        {label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
               Online ordering is paused during the renovation. Existing orders and customer records
               remain safely preserved.
