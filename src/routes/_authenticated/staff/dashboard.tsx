@@ -50,7 +50,9 @@ function StaffDashboard() {
             <p className="text-sm font-bold uppercase tracking-[0.14em] text-primary">
               Morning control
             </p>
-            <h1 className="mt-1 text-3xl font-bold">Today’s run</h1>
+            <h1 className="mt-1 text-3xl font-bold">
+              {data?.isToday === false ? "Next run" : "Today’s run"}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {data?.deliveryDate ?? "Loading…"} · {data?.windowLabel ?? "6:30 AM – 7:15 AM"}
             </p>

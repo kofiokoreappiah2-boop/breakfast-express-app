@@ -131,7 +131,7 @@ function CheckoutPage() {
           <div className="surface-card mt-6 p-8 text-center">
             <p className="text-xl font-bold">Orders for this run have closed</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Ordering reopens at 5:00 PM for the next available morning delivery.
+              Ordering reopens at 8:00 AM for the next available morning delivery.
             </p>
             <Link
               to="/"

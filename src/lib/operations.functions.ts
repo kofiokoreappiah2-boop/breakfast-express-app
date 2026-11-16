@@ -8,8 +8,8 @@ export const getMorningOperations = createServerFn({ method: "GET" })
     const { assertPermission } = await import("@/lib/control-center.server");
     await assertPermission(context, "operations.view");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { getOrderSchedule } = await import("@/lib/delivery-schedule");
-    const schedule = getOrderSchedule();
+    const { getOperationsSchedule } = await import("@/lib/delivery-schedule");
+    const schedule = getOperationsSchedule();
 
     const { data: orders, error } = await supabaseAdmin
       .from("orders")
@@ -73,7 +73,7 @@ export const getMorningOperations = createServerFn({ method: "GET" })
     return {
       deliveryDate: schedule.deliveryDate,
       windowLabel: schedule.windowLabel,
-      orderingOpen: schedule.orderingOpen,
+      isToday: schedule.isToday,
       orderCount: (orders ?? []).length,
       expectedSales: money((orders ?? []).reduce((sum, order) => sum + Number(order.total), 0)),
       paidOrders: (orders ?? []).filter((order) => order.payment_status === "Paid").length,

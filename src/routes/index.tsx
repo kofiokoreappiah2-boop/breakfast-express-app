@@ -171,7 +171,7 @@ function HomePage() {
               <div className="rounded-xl bg-secondary px-4 py-3 text-sm">
                 <strong className="block">Orders close at 5:45 AM</strong>
                 <span className="text-muted-foreground">
-                  {ordering.open ? "Order now for this run." : "Ordering reopens at 5:00 PM."}
+                  {ordering.open ? "Order now for this run." : "Ordering reopens at 8:00 AM."}
                 </span>
               </div>
             </div>

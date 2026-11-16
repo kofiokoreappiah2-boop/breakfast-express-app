@@ -3,7 +3,7 @@ const GHANA_TIME_ZONE = "Africa/Accra";
 export const DELIVERY_WINDOW_LABEL = "6:30 AM – 7:15 AM";
 export const DELIVERY_START_TIME = "06:30";
 export const DELIVERY_END_TIME = "07:15";
-export const ORDER_OPEN_TIME = "17:00";
+export const ORDER_OPEN_TIME = "08:00";
 export const ORDER_CUTOFF_TIME = "05:45";
 
 // Sunday (0) through Friday (5). Saturday is the weekly rest day.
@@ -92,6 +92,37 @@ export function getOrderSchedule(now = new Date()): OrderSchedule {
 }
 
 export type DeliverySchedule = { deliveryDate: string; automaticallyAvailable: boolean };
+
+export type OperationsSchedule = {
+  deliveryDate: string;
+  windowLabel: string;
+  isToday: boolean;
+};
+
+/**
+ * Resolve the delivery run staff should operate.
+ *
+ * Unlike customer ordering, today's run must not advance at the 5:45 AM
+ * ordering cutoff. On a service day it remains anchored to the Ghana calendar
+ * date while the storefront can already be preparing the following run.
+ */
+export function getOperationsSchedule(now = new Date()): OperationsSchedule {
+  const clock = ghanaClock(now);
+  if (isServiceDate(clock.date)) {
+    return {
+      deliveryDate: clock.date,
+      windowLabel: DELIVERY_WINDOW_LABEL,
+      isToday: true,
+    };
+  }
+
+  const next = getOrderSchedule(now);
+  return {
+    deliveryDate: next.deliveryDate,
+    windowLabel: next.windowLabel,
+    isToday: false,
+  };
+}
 
 /** Compatibility wrapper used by the control center. */
 export function getDeliverySchedule(_startTime: string, now = new Date()): DeliverySchedule {

@@ -131,7 +131,7 @@ export const createOrder = createServerFn({ method: "POST" })
 
     const schedule = getOrderSchedule();
     if (!schedule.orderingOpen) {
-      throw new Error("Orders for this morning have closed. Ordering reopens at 5:00 PM.");
+      throw new Error("Orders for this morning have closed. Ordering reopens at 8:00 AM.");
     }
     if (data.deliveryWindow !== DELIVERY_WINDOW_LABEL) {
       throw new Error("Please refresh the checkout and use the current delivery run.");
