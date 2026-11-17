@@ -12,6 +12,7 @@ export const EXPENSE_CATEGORIES = [
 ] as const;
 
 export const EXPENSE_PAYMENT_METHODS = ["Cash", "Mobile Money", "Bank transfer", "Other"] as const;
+export const SALE_PAYMENT_METHODS = EXPENSE_PAYMENT_METHODS;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -30,5 +31,14 @@ export const expenseSchema = z.object({
   notes: z.string().trim().max(500).default(""),
 });
 
+export const manualSaleSchema = z.object({
+  saleDate: isoDate,
+  description: z.string().trim().min(2).max(200),
+  amount: z.number().positive().max(1_000_000),
+  paymentMethod: z.enum(SALE_PAYMENT_METHODS),
+  notes: z.string().trim().max(500).default(""),
+});
+
 export const voidExpenseSchema = z.object({ id: z.string().uuid() });
+export const voidManualSaleSchema = z.object({ id: z.string().uuid() });
 export const reconcileOrderSchema = z.object({ id: z.string().uuid() });
