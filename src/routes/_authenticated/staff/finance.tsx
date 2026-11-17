@@ -3,17 +3,23 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { CircleCheckBig, Plus, ReceiptText } from "lucide-react";
+import { Banknote, CircleCheckBig, Plus, ReceiptText } from "lucide-react";
 import { StaffNav } from "@/components/StaffNav";
 import { formatCedis } from "@/lib/format";
 import { getMyAccess } from "@/lib/staff.functions";
 import {
   addExpense,
+  addManualSale,
   getFinanceSummary,
   reconcileOrder,
   voidExpense,
+  voidManualSale,
 } from "@/lib/finance.functions";
-import { EXPENSE_CATEGORIES, EXPENSE_PAYMENT_METHODS } from "@/lib/finance.schemas";
+import {
+  EXPENSE_CATEGORIES,
+  EXPENSE_PAYMENT_METHODS,
+  SALE_PAYMENT_METHODS,
+} from "@/lib/finance.schemas";
 
 export const Route = createFileRoute("/_authenticated/staff/finance")({
   head: () => ({
@@ -32,8 +38,10 @@ function FinancePage() {
   const loadAccess = useServerFn(getMyAccess);
   const loadFinance = useServerFn(getFinanceSummary);
   const createExpense = useServerFn(addExpense);
+  const createManualSale = useServerFn(addManualSale);
   const markReconciled = useServerFn(reconcileOrder);
   const markVoided = useServerFn(voidExpense);
+  const markManualSaleVoided = useServerFn(voidManualSale);
 
   const [startDate, setStartDate] = useState(monthStart);
   const [endDate, setEndDate] = useState(today);
@@ -44,6 +52,13 @@ function FinancePage() {
     supplier: "",
     amount: "",
     paymentMethod: EXPENSE_PAYMENT_METHODS[0],
+    notes: "",
+  });
+  const [saleForm, setSaleForm] = useState({
+    saleDate: today(),
+    description: "",
+    amount: "",
+    paymentMethod: SALE_PAYMENT_METHODS[0],
     notes: "",
   });
   const access = useQuery({ queryKey: ["my-access"], queryFn: () => loadAccess({}) });
@@ -64,6 +79,16 @@ function FinancePage() {
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Could not save expense."),
   });
+  const manualSaleMutation = useMutation({
+    mutationFn: () => createManualSale({ data: { ...saleForm, amount: Number(saleForm.amount) } }),
+    onSuccess: () => {
+      toast.success("Manual sale recorded");
+      setSaleForm((current) => ({ ...current, description: "", amount: "", notes: "" }));
+      void refresh();
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not save manual sale."),
+  });
   const reconcileMutation = useMutation({
     mutationFn: (id: string) => markReconciled({ data: { id } }),
     onSuccess: () => {
@@ -79,6 +104,14 @@ function FinancePage() {
       void refresh();
     },
     onError: () => toast.error("Could not void expense."),
+  });
+  const voidManualSaleMutation = useMutation({
+    mutationFn: (id: string) => markManualSaleVoided({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Manual sale voided");
+      void refresh();
+    },
+    onError: () => toast.error("Could not void manual sale."),
   });
 
   const summary = finance.data?.summary;
@@ -119,7 +152,7 @@ function FinancePage() {
             </p>
             <h1 className="mt-1 text-3xl font-bold">Finance</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Income comes from website orders. Enter only business expenses manually.
+              Website orders and sales made outside the app are tracked separately and combined.
             </p>
           </div>
           <div className="flex items-end gap-2">
@@ -144,12 +177,158 @@ function FinancePage() {
           </div>
         </div>
 
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <Metric label="Booked sales" value={formatCedis(summary?.bookedSales ?? 0)} />
           <Metric label="Income received" value={formatCedis(summary?.receivedIncome ?? 0)} />
+          <Metric label="Manual sales" value={formatCedis(summary?.manualSales ?? 0)} />
           <Metric label="Outstanding" value={formatCedis(summary?.outstanding ?? 0)} />
           <Metric label="Expenses" value={formatCedis(summary?.expenses ?? 0)} />
           <Metric label="Net cash" value={formatCedis(summary?.netCash ?? 0)} highlight />
+        </section>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          {access.data.canManageFinance ? (
+            <form
+              className="surface-card p-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!saleForm.description.trim() || Number(saleForm.amount) <= 0) {
+                  toast.error("Add what was sold and a valid amount.");
+                  return;
+                }
+                manualSaleMutation.mutate();
+              }}
+            >
+              <h2 className="flex items-center gap-2 text-xl font-bold">
+                <Banknote className="h-5 w-5 text-primary" /> Record sale outside the app
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Use this for extra stock sold directly. It will count as income received.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="text-sm font-semibold">
+                  Sale date
+                  <input
+                    type="date"
+                    className={`${fieldClass} mt-1`}
+                    value={saleForm.saleDate}
+                    onChange={(e) => setSaleForm({ ...saleForm, saleDate: e.target.value })}
+                  />
+                </label>
+                <label className="text-sm font-semibold">
+                  Amount received
+                  <input
+                    inputMode="decimal"
+                    className={`${fieldClass} mt-1`}
+                    placeholder="0.00"
+                    value={saleForm.amount}
+                    onChange={(e) => setSaleForm({ ...saleForm, amount: e.target.value })}
+                  />
+                </label>
+                <label className="text-sm font-semibold sm:col-span-2">
+                  What was sold?
+                  <input
+                    className={`${fieldClass} mt-1`}
+                    value={saleForm.description}
+                    onChange={(e) => setSaleForm({ ...saleForm, description: e.target.value })}
+                    placeholder="e.g. 2 large puff-puffs and 1 Hausa Koko"
+                  />
+                </label>
+                <label className="text-sm font-semibold sm:col-span-2">
+                  Payment method
+                  <select
+                    className={`${fieldClass} mt-1`}
+                    value={saleForm.paymentMethod}
+                    onChange={(e) =>
+                      setSaleForm({
+                        ...saleForm,
+                        paymentMethod: e.target.value as typeof saleForm.paymentMethod,
+                      })
+                    }
+                  >
+                    {SALE_PAYMENT_METHODS.map((method) => (
+                      <option key={method}>{method}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold sm:col-span-2">
+                  Notes
+                  <textarea
+                    className="mt-1 min-h-20 w-full rounded-xl border border-input bg-card p-3 text-sm"
+                    value={saleForm.notes}
+                    onChange={(e) => setSaleForm({ ...saleForm, notes: e.target.value })}
+                    placeholder="Optional"
+                  />
+                </label>
+              </div>
+              <button
+                disabled={manualSaleMutation.isPending}
+                className="mt-4 h-11 w-full rounded-xl bg-primary font-bold text-primary-foreground disabled:opacity-60"
+              >
+                {manualSaleMutation.isPending ? "Saving…" : "Add to income"}
+              </button>
+            </form>
+          ) : (
+            <div className="surface-card p-5">
+              <h2 className="text-xl font-bold">Manual sales</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Finance managers can record sales made outside the website.
+              </p>
+            </div>
+          )}
+
+          <div className="surface-card overflow-hidden">
+            <div className="p-5">
+              <h2 className="flex items-center gap-2 text-xl font-bold">
+                <Banknote className="h-5 w-5 text-primary" /> Manual sales register
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Direct sales recorded separately from website orders.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left text-sm">
+                <thead className="bg-secondary text-xs uppercase">
+                  <tr>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Items</th>
+                    <th className="px-4 py-3">Method</th>
+                    <th className="px-4 py-3">Amount</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(finance.data?.manualSales ?? []).map((sale) => (
+                    <tr key={sale.id} className={sale.status === "Voided" ? "opacity-50" : ""}>
+                      <td className="px-4 py-3">{sale.saleDate}</td>
+                      <td className="px-4 py-3 font-semibold">{sale.description}</td>
+                      <td className="px-4 py-3">{sale.paymentMethod}</td>
+                      <td className="px-4 py-3">{formatCedis(sale.amount)}</td>
+                      <td className="px-4 py-3 text-right">
+                        {sale.status === "Posted" && access.data.canManageFinance ? (
+                          <button
+                            onClick={() => voidManualSaleMutation.mutate(sale.id)}
+                            className="text-xs font-semibold text-destructive underline"
+                          >
+                            Void
+                          </button>
+                        ) : (
+                          <span className="text-xs">Voided</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {finance.data?.manualSales.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                        No manual sales in this period.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
