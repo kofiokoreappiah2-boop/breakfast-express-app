@@ -3,8 +3,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   expenseSchema,
   financeRangeSchema,
+  manualSaleSchema,
   reconcileOrderSchema,
   voidExpenseSchema,
+  voidManualSaleSchema,
 } from "@/lib/finance.schemas";
 import { money } from "@/lib/format";
 
@@ -20,7 +22,7 @@ export const getFinanceSummary = createServerFn({ method: "GET" })
     const endExclusive = new Date(`${data.endDate}T00:00:00.000Z`);
     endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
 
-    const [ordersRes, expensesRes] = await Promise.all([
+    const [ordersRes, expensesRes, manualSalesRes] = await Promise.all([
       supabaseAdmin
         .from("orders")
         .select(
@@ -37,10 +39,17 @@ export const getFinanceSummary = createServerFn({ method: "GET" })
         .gte("expense_date", data.startDate)
         .lte("expense_date", data.endDate)
         .order("expense_date", { ascending: false }),
+      supabaseAdmin
+        .from("manual_sales")
+        .select("id, sale_date, description, amount, payment_method, notes, status, created_at")
+        .gte("sale_date", data.startDate)
+        .lte("sale_date", data.endDate)
+        .order("sale_date", { ascending: false }),
     ]);
 
     if (ordersRes.error) throw new Error("Could not load income records.");
     if (expensesRes.error) throw new Error("Could not load expense records.");
+    if (manualSalesRes.error) throw new Error("Could not load manual sales records.");
 
     const orders = (ordersRes.data ?? []).map((order) => ({
       id: order.id,
@@ -66,12 +75,28 @@ export const getFinanceSummary = createServerFn({ method: "GET" })
       status: expense.status,
       createdAt: expense.created_at,
     }));
+    const manualSales = (manualSalesRes.data ?? []).map((sale) => ({
+      id: sale.id,
+      saleDate: sale.sale_date,
+      description: sale.description,
+      amount: Number(sale.amount),
+      paymentMethod: sale.payment_method,
+      notes: sale.notes,
+      status: sale.status,
+      createdAt: sale.created_at,
+    }));
 
     const activeOrders = orders.filter((order) => order.status !== "Cancelled");
     const received = activeOrders.filter((order) => order.paymentStatus === "Paid");
     const postedExpenses = expenses.filter((expense) => expense.status === "Posted");
-    const bookedSales = money(activeOrders.reduce((sum, order) => sum + order.total, 0));
-    const receivedIncome = money(received.reduce((sum, order) => sum + order.total, 0));
+    const postedManualSales = manualSales.filter((sale) => sale.status === "Posted");
+    const manualSalesTotal = money(postedManualSales.reduce((sum, sale) => sum + sale.amount, 0));
+    const bookedSales = money(
+      activeOrders.reduce((sum, order) => sum + order.total, 0) + manualSalesTotal,
+    );
+    const receivedIncome = money(
+      received.reduce((sum, order) => sum + order.total, 0) + manualSalesTotal,
+    );
     const expenseTotal = money(postedExpenses.reduce((sum, expense) => sum + expense.amount, 0));
 
     return {
@@ -84,17 +109,85 @@ export const getFinanceSummary = createServerFn({ method: "GET" })
         mobileMoney: money(
           received
             .filter((order) => order.paymentMethod === "Mobile Money")
-            .reduce((sum, order) => sum + order.total, 0),
+            .reduce((sum, order) => sum + order.total, 0) +
+            postedManualSales
+              .filter((sale) => sale.paymentMethod === "Mobile Money")
+              .reduce((sum, sale) => sum + sale.amount, 0),
         ),
         cash: money(
           received
             .filter((order) => order.paymentMethod === "Payment on Delivery")
-            .reduce((sum, order) => sum + order.total, 0),
+            .reduce((sum, order) => sum + order.total, 0) +
+            postedManualSales
+              .filter((sale) => sale.paymentMethod === "Cash")
+              .reduce((sum, sale) => sum + sale.amount, 0),
         ),
+        manualSales: manualSalesTotal,
       },
       orders,
       expenses,
+      manualSales,
     };
+  });
+
+export const addManualSale = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => manualSaleSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertPermission } = await import("@/lib/control-center.server");
+    await assertPermission(context, "finance.manage");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: sale, error } = await supabaseAdmin
+      .from("manual_sales")
+      .insert({
+        sale_date: data.saleDate,
+        description: data.description,
+        amount: data.amount,
+        payment_method: data.paymentMethod,
+        notes: data.notes,
+        created_by: context.userId,
+      })
+      .select("*")
+      .single();
+    if (error || !sale) throw new Error("Could not save the manual sale.");
+    await supabaseAdmin.from("manual_sale_audit_log").insert({
+      manual_sale_id: sale.id,
+      staff_user_id: context.userId,
+      action_type: "Created",
+      new_value: sale,
+    });
+    return { ok: true };
+  });
+
+export const voidManualSale = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: unknown) => voidManualSaleSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    const { assertPermission } = await import("@/lib/control-center.server");
+    await assertPermission(context, "finance.manage");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: previous } = await supabaseAdmin
+      .from("manual_sales")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+    if (!previous) throw new Error("Manual sale not found.");
+    const { data: updated, error } = await supabaseAdmin
+      .from("manual_sales")
+      .update({ status: "Voided", updated_at: new Date().toISOString() })
+      .eq("id", data.id)
+      .eq("status", "Posted")
+      .select("*")
+      .single();
+    if (error || !updated) throw new Error("Could not void the manual sale.");
+    await supabaseAdmin.from("manual_sale_audit_log").insert({
+      manual_sale_id: data.id,
+      staff_user_id: context.userId,
+      action_type: "Voided",
+      previous_value: previous,
+      new_value: updated,
+    });
+    return { ok: true };
   });
 
 export const addExpense = createServerFn({ method: "POST" })
