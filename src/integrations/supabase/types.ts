@@ -238,6 +238,83 @@ export type Database = {
         };
         Relationships: [];
       };
+      manual_sale_audit_log: {
+        Row: {
+          action_type: string;
+          created_at: string;
+          id: string;
+          manual_sale_id: string;
+          new_value: Json | null;
+          previous_value: Json | null;
+          staff_user_id: string | null;
+        };
+        Insert: {
+          action_type: string;
+          created_at?: string;
+          id?: string;
+          manual_sale_id: string;
+          new_value?: Json | null;
+          previous_value?: Json | null;
+          staff_user_id?: string | null;
+        };
+        Update: {
+          action_type?: string;
+          created_at?: string;
+          id?: string;
+          manual_sale_id?: string;
+          new_value?: Json | null;
+          previous_value?: Json | null;
+          staff_user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "manual_sale_audit_log_manual_sale_id_fkey";
+            columns: ["manual_sale_id"];
+            isOneToOne: false;
+            referencedRelation: "manual_sales";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      manual_sales: {
+        Row: {
+          amount: number;
+          created_at: string;
+          created_by: string;
+          description: string;
+          id: string;
+          notes: string;
+          payment_method: string;
+          sale_date: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          created_by: string;
+          description: string;
+          id?: string;
+          notes?: string;
+          payment_method: string;
+          sale_date?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          created_by?: string;
+          description?: string;
+          id?: string;
+          notes?: string;
+          payment_method?: string;
+          sale_date?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       order_audit_log: {
         Row: {
           action_type: string;
@@ -821,30 +898,3 @@ export type Enums<
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never;
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals;
-  }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-}
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never;
-
-export const Constants = {
-  public: {
-    Enums: {
-      app_role: ["admin", "owner", "staff"],
-      order_status: ["New", "Confirmed", "Preparing", "Out for Delivery", "Delivered", "Cancelled"],
-      payment_status: ["Pending", "Paid", "Failed"],
-    },
-  },
-} as const;
